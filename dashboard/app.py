@@ -298,6 +298,36 @@ else:
 
 st.divider()
 
+st.subheader("📡 Live Infrastructure Event Stream")
+
+events = []
+
+if hotspot_risk == "HIGH":
+    events.extend([
+        "WARNING • Hotspot threshold exceeded",
+        "ALERT • Cooling efficiency degradation detected",
+        "ACTION • AI recommendation engine triggered",
+        "INFO • Thermal propagation increasing near rack boundary",
+    ])
+else:
+    events.extend([
+        "INFO • Thermal conditions stable",
+        "INFO • Cooling network operating normally",
+        "INFO • AI monitoring active",
+        "INFO • No critical infrastructure anomalies detected",
+    ])
+
+events.extend([
+    f"METRIC • GPU utilization at {gpu_utilization}%",
+    f"METRIC • Estimated rack power at {heat_load_kw} kW",
+    f"METRIC • Cooling loop pressure at {cooling_pressure} bar",
+])
+
+for event in events:
+    st.code(event)
+
+st.divider()
+
 st.subheader("📘 Project Summary")
 
 st.write(
