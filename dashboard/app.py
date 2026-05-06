@@ -235,6 +235,35 @@ st.write(
 
 st.divider()
 
+st.subheader("🤖 LiquidFlow AI Copilot")
+
+user_question = st.text_input(
+    "Ask the thermal AI assistant",
+    placeholder="Example: Why is hotspot risk high?"
+)
+
+if user_question:
+    st.write("AI Copilot Response:")
+
+    if hotspot_risk == "HIGH":
+        st.warning(
+            "The system is detecting high thermal risk because the predicted outlet "
+            "temperature exceeds the safe operating threshold. The most effective first "
+            "actions are increasing coolant flow, improving cooling efficiency, or reducing "
+            "rack heat load."
+        )
+    else:
+        st.success(
+            "The system is currently operating within the acceptable thermal range. "
+            "Cooling margin is positive and no immediate intervention is required."
+        )
+
+    st.caption(
+        "Prototype copilot logic. Future version can connect to Qwen, Llama, or AMD-hosted inference APIs."
+    )
+
+st.divider()
+
 st.caption(
     "LiquidFlow AI • Built for the AMD Developer Hackathon • "
     "Physics-informed infrastructure intelligence"
