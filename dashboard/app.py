@@ -16,7 +16,21 @@ st.set_page_config(
     layout="wide",
 )
 
-st.markdown("# 💧 LiquidFlow AI")
+st.markdown(
+    """
+    <h1 style='font-size: 4rem; margin-bottom: 0;'>
+        💧 LiquidFlow AI
+    </h1>
+
+    <p style='font-size: 1.2rem; color: #9aa0aa;'>
+        Physics-informed thermal intelligence for high-density AI infrastructure
+    </p>
+    """,
+    unsafe_allow_html=True
+)
+st.success(
+    "System online • Thermal digital twin active • AI monitoring enabled"
+)
 st.caption("Physics-informed thermal intelligence for high-density AI infrastructure")
 st.divider()
 
@@ -55,9 +69,9 @@ estimated_efficiency = round(cooling_efficiency * 100, 1)
 k1, k2, k3, k4 = st.columns(4)
 
 k1.metric("Outlet Temperature", f"{outlet_temp} °C")
-k2.metric("Hotspot Risk", hotspot_risk)
-k3.metric("Thermal Risk Score", f"{risk_score}/100")
-k4.metric("Cooling Margin", f"{cooling_margin} °C")
+k2.metric("Hotspot Classification", hotspot_risk)
+k3.metric("Thermal Risk Index", f"{risk_score}/100")
+k4.metric("Cooling Safety Margin", f"{cooling_margin} °C")
 
 st.divider()
 
@@ -157,4 +171,11 @@ st.write(
     "LiquidFlow AI is a physics-informed thermal intelligence platform for next-generation "
     "AI infrastructure. It simulates liquid cooling behavior, predicts hotspot risk, "
     "visualizes thermal fields, and provides AI-assisted cooling recommendations."
+)
+
+st.divider()
+
+st.caption(
+    "LiquidFlow AI • Built for the AMD Developer Hackathon • "
+    "Physics-informed infrastructure intelligence"
 )
