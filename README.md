@@ -62,3 +62,28 @@ Future Multimodal Vision Analysis
 ## Demo Preview
 
 <img src="screenshots/dashboard-high-risk-demo.png" width="900"/>
+
+## Why AMD
+
+LiquidFlow AI is designed for high-performance AI infrastructure workloads and aligns naturally with AMD GPU acceleration and ROCm-based compute environments.
+
+Potential AMD acceleration pathways include:
+
+- Physics-informed neural network (PINN) training on AMD Instinct GPUs
+- High-throughput thermal simulation workloads
+- Multimodal vision inference using ROCm-compatible models
+- GPU-accelerated infrastructure optimization
+- Real-time AI inference for thermal digital twins
+
+The project is being developed as part of the AMD Developer Hackathon using AMD Developer Cloud resources.
+
+## Future Roadmap
+
+- Real PINN integration for PDE-constrained thermal prediction
+- Qwen-VL or Llama Vision integration
+- GPU telemetry ingestion
+- Real-time rack monitoring
+- Distributed cooling optimization
+- AI infrastructure copilot
+- Multi-rack thermal orchestration
+- Deployment on AMD GPU infrastructure
