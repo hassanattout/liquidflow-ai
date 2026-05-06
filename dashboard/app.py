@@ -107,6 +107,33 @@ k5.metric("Surrogate Prediction",f"{surrogate_prediction} °C")
 
 st.divider()
 
+st.subheader("🧪 Physics Model Comparison")
+
+baseline_error = abs(outlet_temp - surrogate_prediction)
+st.write(
+    "Comparison between the thermal simulation engine and the surrogate prediction layer."
+)
+
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    st.metric("Simulation Engine", f"{outlet_temp} °C")
+
+with c2:
+    st.metric("Surrogate Model", f"{surrogate_prediction} °C")
+
+with c3:
+    st.metric("Model Difference", f"{round(baseline_error, 2)} °C")
+
+if baseline_error < 2:
+    st.success("Surrogate model is closely aligned with the physics simulation.")
+elif baseline_error < 5:
+    st.info("Surrogate model shows moderate deviation from the physics simulation.")
+else:
+    st.warning("Surrogate model deviation is high. Future PINN training can reduce this gap.")
+
+st.divider()
+
 m1, m2, m3, m4 = st.columns(4)
 
 gpu_utilization = min(
