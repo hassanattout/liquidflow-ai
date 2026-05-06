@@ -10,6 +10,13 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulations.thermal import thermal
 
+logo = Image.open("assets/liquidflow-logo.png")
+
+st.image(
+    logo,
+    width=120,
+)
+
 st.set_page_config(
     page_title="LiquidFlow AI",
     page_icon="💧",
@@ -31,6 +38,18 @@ st.markdown(
 st.success(
     "System online • Thermal digital twin active • AI monitoring enabled"
 )
+
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    st.success("Cooling Network Active")
+
+with c2:
+    st.success("AI Monitoring Online")
+
+with c3:
+    st.success("Thermal Twin Synced")
+
 st.divider()
 
 with st.sidebar:
