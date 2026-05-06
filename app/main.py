@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from simulations.thermal import thermal
+from models.surrogate_model import surrogate_temperature_prediction
 
 app = FastAPI(
     title="LiquidFlow AI",
@@ -29,6 +30,13 @@ def simulate(
         inlet_temp,
         heat_load_kw,
         cooling_efficiency,
+    )
+
+    surrogate_prediction = surrogate_temperature_prediction(
+    flow_rate,
+    inlet_temp,
+    heat_load_kw,
+    cooling_efficiency,
     )
 
     if outlet_temp is None:
@@ -65,6 +73,8 @@ def simulate(
             "hotspot_risk": hotspot_risk,
             "thermal_risk_score": risk_score,
             "cooling_margin": cooling_margin,
+            "surrogate_prediction": surrogate_prediction,
+            "model_difference": round(abs(outlet_temp - surrogate_prediction), 2),
         },
         "recommendations": recommendations,
     }
