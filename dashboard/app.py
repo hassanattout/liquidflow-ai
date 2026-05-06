@@ -142,7 +142,7 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
         else:
             color = (0, 255, 0)
 
-        draw.rectangle(box, outline=color, width=5)
+        draw.rectangle(box, outline=(255, 40, 40), width=10)
 
         text = f"{label} | {severity} | {round(confidence * 100)}%"
         text_position = (box[0], max(0, box[1] - 28))
@@ -157,7 +157,7 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
             fill="black",
         )
 
-        draw.text(text_position, text, fill=color)
+        draw.text(text_position, text, fill=(255, 60, 60))
 
     return overlay, detections
 
