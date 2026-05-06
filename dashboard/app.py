@@ -138,9 +138,9 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
         confidence = detection["confidence"]
 
         if severity in ["Critical", "High"]:
-            color = "red"
+            color = (255, 0, 0)
         else:
-            color = "green"
+            color = (0, 255, 0)
 
         draw.rectangle(box, outline=color, width=5)
 
