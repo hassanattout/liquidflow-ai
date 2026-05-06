@@ -10,17 +10,17 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulations.thermal import thermal
 
+st.set_page_config(
+    page_title="LiquidFlow AI",
+    page_icon="💧",
+    layout="wide",
+)
+
 logo = Image.open("assets/liquidflow-logo.png")
 
 st.image(
     logo,
     width=120,
-)
-
-st.set_page_config(
-    page_title="LiquidFlow AI",
-    page_icon="💧",
-    layout="wide",
 )
 
 st.markdown(
@@ -33,8 +33,9 @@ st.markdown(
         Physics-informed thermal intelligence for high-density AI infrastructure
     </p>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
+
 st.success(
     "System online • Thermal digital twin active • AI monitoring enabled"
 )
@@ -56,7 +57,7 @@ with st.sidebar:
 
     st.markdown("## ⚙️ Control Panel")
     st.caption("Thermal system configuration")
-    
+
     st.header("System Inputs")
 
     flow_rate = st.slider("Coolant flow rate", 1.0, 50.0, 12.0)
@@ -97,6 +98,49 @@ k4.metric("Cooling Safety Margin", f"{cooling_margin} °C")
 
 st.divider()
 
+m1, m2, m3, m4 = st.columns(4)
+
+gpu_utilization = min(
+    100,
+    round((heat_load_kw / 300) * 100),
+)
+
+cooling_pressure = round(
+    flow_rate * 0.42,
+    2,
+)
+
+pue_estimate = round(
+    1.1 + ((100 - estimated_efficiency) / 100),
+    2,
+)
+
+with m1:
+    st.metric(
+        "Estimated Rack Power",
+        f"{heat_load_kw} kW",
+    )
+
+with m2:
+    st.metric(
+        "GPU Utilization",
+        f"{gpu_utilization}%",
+    )
+
+with m3:
+    st.metric(
+        "Cooling Loop Pressure",
+        f"{cooling_pressure} bar",
+    )
+
+with m4:
+    st.metric(
+        "Estimated PUE",
+        f"{pue_estimate}",
+    )
+
+st.divider()
+
 left, right = st.columns([1.2, 1])
 
 with left:
@@ -109,57 +153,50 @@ with left:
     base_temp = inlet_temp
     thermal_gradient = outlet_temp - inlet_temp
 
-    hotspot = 8 * np.exp(-((X - 0.75) ** 2 + (Y - 0.5) ** 2) / 0.015)
-
-    Z = base_temp + thermal_gradient * X + hotspot
-
     time_factor = st.slider(
-    "Simulation Time Step",
-    0.0,
-    1.0,
-    0.5,
-)
-
-dynamic_hotspot = (
-    8
-    * np.exp(
-        -(
-            (X - (0.55 + 0.25 * time_factor)) ** 2
-            + (Y - 0.5) ** 2
-        )
-        / 0.015
+        "Simulation Time Step",
+        0.0,
+        1.0,
+        0.5,
     )
-)
 
-Z_dynamic = (
-    base_temp
-    + thermal_gradient * X
-    + dynamic_hotspot
-)
+    dynamic_hotspot = (
+        8
+        * np.exp(
+            -(
+                (X - (0.55 + 0.25 * time_factor)) ** 2
+                + (Y - 0.5) ** 2
+            )
+            / 0.015
+        )
+    )
 
-fig, ax = plt.subplots(figsize=(8, 5))
+    Z_dynamic = (
+        base_temp
+        + thermal_gradient * X
+        + dynamic_hotspot
+    )
 
-heatmap = ax.contourf(
-    X,
-    Y,
-    Z_dynamic,
-    levels=35,
-)
+    fig, ax = plt.subplots(figsize=(8, 5))
 
-plt.colorbar(
-    heatmap,
-    ax=ax,
-    label="Temperature °C",
-)
+    heatmap = ax.contourf(
+        X,
+        Y,
+        Z_dynamic,
+        levels=35,
+    )
 
-ax.set_title(
-    "Dynamic Thermal Propagation Simulation"
-)
+    plt.colorbar(
+        heatmap,
+        ax=ax,
+        label="Temperature °C",
+    )
 
-ax.set_xlabel("Rack Width")
-ax.set_ylabel("Rack Height")
+    ax.set_title("Dynamic Thermal Propagation Simulation")
+    ax.set_xlabel("Rack Width")
+    ax.set_ylabel("Rack Height")
 
-st.pyplot(fig)
+    st.pyplot(fig)
 
 with right:
     st.subheader("🧠 AI Recommendation Engine")
@@ -212,7 +249,7 @@ if uploaded_image is not None:
     st.image(
         image,
         caption="Uploaded thermal / infrastructure image",
-        use_container_width=True
+        use_container_width=True,
     )
 
     st.success("Vision analysis pipeline active")
@@ -224,7 +261,7 @@ if uploaded_image is not None:
         "Cooling asymmetry identified near rack boundary",
         "Potential hotspot propagation risk",
         "Thermal gradient exceeds nominal threshold",
-        "Infrastructure cooling optimization recommended"
+        "Infrastructure cooling optimization recommended",
     ]
 
     for obs in observations:
@@ -275,7 +312,7 @@ st.subheader("🤖 LiquidFlow AI Copilot")
 
 user_question = st.text_input(
     "Ask the thermal AI assistant",
-    placeholder="Example: Why is hotspot risk high?"
+    placeholder="Example: Why is hotspot risk high?",
 )
 
 if user_question:
