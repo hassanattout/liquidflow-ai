@@ -328,6 +328,29 @@ for event in events:
 
 st.divider()
 
+st.subheader("📈 Thermal Anomaly Trend")
+
+time_steps = np.arange(1, 21)
+
+thermal_trend = (
+    inlet_temp
+    + (outlet_temp - inlet_temp) * (time_steps / 20)
+    + 2 * np.sin(time_steps / 2)
+)
+
+fig_trend, ax_trend = plt.subplots(figsize=(8, 3))
+
+ax_trend.plot(time_steps, thermal_trend, marker="o")
+ax_trend.axhline(30, linestyle="--", label="Hotspot threshold")
+ax_trend.set_title("Predicted Thermal Risk Evolution")
+ax_trend.set_xlabel("Time Step")
+ax_trend.set_ylabel("Temperature °C")
+ax_trend.legend()
+
+st.pyplot(fig_trend)
+
+st.divider()
+
 st.subheader("📘 Project Summary")
 
 st.write(
