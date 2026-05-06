@@ -94,15 +94,53 @@ with left:
 
     Z = base_temp + thermal_gradient * X + hotspot
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    heatmap = ax.contourf(X, Y, Z, levels=35)
-    plt.colorbar(heatmap, ax=ax, label="Temperature °C")
+    time_factor = st.slider(
+    "Simulation Time Step",
+    0.0,
+    1.0,
+    0.5,
+)
 
-    ax.set_title("Predicted Cooling Plate Temperature Field")
-    ax.set_xlabel("Rack Width")
-    ax.set_ylabel("Rack Height")
+dynamic_hotspot = (
+    8
+    * np.exp(
+        -(
+            (X - (0.55 + 0.25 * time_factor)) ** 2
+            + (Y - 0.5) ** 2
+        )
+        / 0.015
+    )
+)
 
-    st.pyplot(fig)
+Z_dynamic = (
+    base_temp
+    + thermal_gradient * X
+    + dynamic_hotspot
+)
+
+fig, ax = plt.subplots(figsize=(8, 5))
+
+heatmap = ax.contourf(
+    X,
+    Y,
+    Z_dynamic,
+    levels=35,
+)
+
+plt.colorbar(
+    heatmap,
+    ax=ax,
+    label="Temperature °C",
+)
+
+ax.set_title(
+    "Dynamic Thermal Propagation Simulation"
+)
+
+ax.set_xlabel("Rack Width")
+ax.set_ylabel("Rack Height")
+
+st.pyplot(fig)
 
 with right:
     st.subheader("🧠 AI Recommendation Engine")
