@@ -20,13 +20,13 @@ logo = Image.open("assets/liquidflow-logo.png")
 
 st.image(
     logo,
-    width=120,
+    width=90,
 )
 
 st.markdown(
     """
     <h1 style='font-size: 4rem; margin-bottom: 0;'>
-        💧 LiquidFlow AI
+        LiquidFlow AI
     </h1>
 
     <p style='font-size: 1.2rem; color: #9aa0aa;'>
