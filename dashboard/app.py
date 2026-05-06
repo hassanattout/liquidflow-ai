@@ -9,6 +9,7 @@ from PIL import Image
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulations.thermal import thermal
+from models.surrogate_model import surrogate_temperature_prediction
 
 st.set_page_config(
     page_title="LiquidFlow AI",
@@ -79,6 +80,13 @@ outlet_temp = thermal(
     cooling_efficiency,
 )
 
+surrogate_prediction = surrogate_temperature_prediction(
+    flow_rate,
+    inlet_temp,
+    heat_load_kw,
+    cooling_efficiency,
+)
+
 if outlet_temp is None:
     st.error("Invalid parameters")
     st.stop()
@@ -89,12 +97,13 @@ risk_score = min(100, max(0, round(((outlet_temp - 20) / 30) * 100)))
 cooling_margin = round(max(0, 50 - outlet_temp), 2)
 estimated_efficiency = round(cooling_efficiency * 100, 1)
 
-k1, k2, k3, k4 = st.columns(4)
+k1, k2, k3, k4, k5 = st.columns(5)
 
 k1.metric("Outlet Temperature", f"{outlet_temp} °C")
 k2.metric("Hotspot Classification", hotspot_risk)
 k3.metric("Thermal Risk Index", f"{risk_score}/100")
 k4.metric("Cooling Safety Margin", f"{cooling_margin} °C")
+k5.metric("Surrogate Prediction",f"{surrogate_prediction} °C")
 
 st.divider()
 

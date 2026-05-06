@@ -29,6 +29,7 @@ Streamlit App: (https://liquiflow-ai.streamlit.app)
 - AI recommendation engine
 - Thermal image upload module
 - Designed for AMD Developer Hackathon
+- Surrogate thermal prediction module (PINN-ready architecture)
 
 ## Run API
 
