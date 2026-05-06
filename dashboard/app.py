@@ -31,7 +31,6 @@ st.markdown(
 st.success(
     "System online • Thermal digital twin active • AI monitoring enabled"
 )
-st.caption("Physics-informed thermal intelligence for high-density AI infrastructure")
 st.divider()
 
 with st.sidebar:
