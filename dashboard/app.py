@@ -98,10 +98,10 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
                 "severity": "Critical",
                 "confidence": 0.91,
                 "box": (
-                    int(width * 0.52),
-                    int(height * 0.22),
-                    int(width * 0.90),
-                    int(height * 0.62),
+                    int(width * 0.57),
+                    int(height * 0.18),
+                    int(width * 0.82),
+                    int(height * 0.48),
                 ),
             },
             {
