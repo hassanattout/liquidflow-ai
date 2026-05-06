@@ -34,6 +34,10 @@ st.success(
 st.divider()
 
 with st.sidebar:
+
+    st.markdown("## ⚙️ Control Panel")
+    st.caption("Thermal system configuration")
+    
     st.header("System Inputs")
 
     flow_rate = st.slider("Coolant flow rate", 1.0, 50.0, 12.0)
@@ -77,7 +81,7 @@ st.divider()
 left, right = st.columns([1.2, 1])
 
 with left:
-    st.subheader("Thermal Field Simulation")
+    st.subheader("🌡️ Thermal Field Simulation")
 
     x = np.linspace(0, 1, 100)
     y = np.linspace(0, 1, 100)
@@ -101,7 +105,7 @@ with left:
     st.pyplot(fig)
 
 with right:
-    st.subheader("AI Recommendation Engine")
+    st.subheader("🧠 AI Recommendation Engine")
 
     if hotspot_risk == "HIGH":
         st.error("Critical hotspot formation detected")
@@ -123,7 +127,7 @@ with right:
 
     st.divider()
 
-    st.subheader("Infrastructure AI Insight")
+    st.subheader("🏗️ Infrastructure AI Insight")
 
     if outlet_temp > 40:
         st.warning(
@@ -142,7 +146,7 @@ with right:
 
 st.divider()
 
-st.subheader("Multimodal Thermal Image Analysis")
+st.subheader("👁️ Multimodal Thermal Image Analysis")
 
 if uploaded_image is not None:
     image = Image.open(uploaded_image)
@@ -164,7 +168,7 @@ else:
 
 st.divider()
 
-st.subheader("Project Summary")
+st.subheader("📘 Project Summary")
 
 st.write(
     "LiquidFlow AI is a physics-informed thermal intelligence platform for next-generation "
