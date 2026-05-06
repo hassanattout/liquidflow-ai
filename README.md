@@ -4,6 +4,21 @@ Physics-informed thermal intelligence for high-density AI infrastructure.
 
 LiquidFlow AI simulates liquid cooling behavior, predicts hotspot risk, visualizes thermal fields, and provides AI-assisted recommendations for next-generation GPU racks and AI data centers.
 
+## Live Demo
+
+Streamlit App: (https://liquiflow-ai.streamlit.app)
+
+## Tech Stack
+
+- Python
+- Streamlit
+- FastAPI
+- NumPy
+- Matplotlib
+- PIL
+- AMD Developer Cloud / ROCm roadmap
+- Future Qwen-VL or Llama Vision integration
+
 ## Features
 
 - Thermal simulation API with FastAPI
