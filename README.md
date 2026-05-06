@@ -165,10 +165,12 @@ AI Infrastructure Recommendations
 - Infrastructure optimization engine
 
 ## Vision AI
-- AI hotspot overlays
+- AI-style hotspot overlays
+- Detection confidence scores
 - Multimodal infrastructure workflow
-- Future Qwen-VL integration
-- Future Llama Vision integration
+- Prototype vision inspection logic
+- Future Qwen-VL integration through AMD Developer Cloud or Hugging Face inference
+- Future Llama Vision integration through cloud GPU inference
 
 ## Infrastructure
 - AMD Developer Cloud roadmap
@@ -182,7 +184,7 @@ AI Infrastructure Recommendations
 ## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/liquidflow-ai.git
+git clone https://github.com/hassanattout/liquidflow-ai.git
 cd liquidflow-ai
 ```
 
@@ -251,6 +253,14 @@ Potential AMD acceleration pathways include:
 - Real-time thermal digital twins for AI clusters
 
 The project is being developed using AMD Developer Cloud resources as part of the AMD Developer Hackathon.
+
+---
+
+# ⚠️ Current Prototype Status
+
+The current version uses physics-based simulation logic, a surrogate prediction module, optimization heuristics, and AI-style vision overlays.
+
+The multimodal vision module currently provides prototype infrastructure inspection behavior. Future versions will connect to Qwen-VL or Llama Vision through AMD Developer Cloud, ROCm-compatible inference, or Hugging Face deployment.
 
 ---
 
