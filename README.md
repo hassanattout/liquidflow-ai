@@ -39,3 +39,26 @@ AI infrastructure is becoming increasingly power-dense. Liquid cooling is essent
 
 LiquidFlow AI acts as a thermal digital twin for AI infrastructure, helping operators predict hotspots, evaluate cooling efficiency, and make better infrastructure decisions.
 
+## System Architecture
+
+```text
+User Input
+    ↓
+Streamlit Dashboard
+    ↓
+FastAPI Backend
+    ↓
+Thermal Simulation Engine
+    ↓
+Hotspot Detection + Risk Scoring
+    ↓
+AI Recommendation Engine
+    ↓
+Thermal Visualization Layer
+    ↓
+Future Multimodal Vision Analysis
+```
+
+## Demo Preview
+
+<img src="screenshots/dashboard-high-risk-demo.png" width="900"/>
