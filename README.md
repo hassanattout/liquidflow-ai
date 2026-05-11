@@ -1,204 +1,176 @@
 # 💧 LiquidFlow AI
 
-### Physics-Informed Thermal Intelligence for Next-Generation AI Infrastructure
+### Thermal Intelligence Layer for High-Density AI Infrastructure
 
-LiquidFlow AI is a real-time thermal digital twin platform designed for high-density AI infrastructure and liquid-cooled GPU systems.
+LiquidFlow AI is a physics-informed thermal intelligence platform for liquid-cooled GPU clusters and next-generation AI data centers.
 
-The platform combines:
-- thermal simulation
-- infrastructure optimization
-- multimodal AI workflows
-- hotspot detection
-- surrogate modeling
-- AI-assisted cooling recommendations
+The platform combines thermal simulation, multi-rack propagation modeling, surrogate risk estimation, cooling optimization, infrastructure telemetry visualization, and operator recommendations.
 
-to help operators monitor, understand, and optimize thermal behavior inside modern AI data centers.
-
-Built for the AMD Developer Hackathon.
+It is designed as an early prototype of an AI infrastructure intelligence layer: a system that helps operators understand, forecast, and optimize thermal behavior in high-density compute environments.
 
 ---
 
-# 🚀 Live Demo
+## Live Demo
 
 ### Streamlit Dashboard
+
 https://liquiflow-ai.streamlit.app
 
 ---
 
-# 🧠 Core Idea
+## Core Thesis
 
-AI infrastructure is becoming increasingly power-dense.
+AI infrastructure is becoming physically constrained.
 
-Modern GPU racks can exceed:
-- 50kW
-- 100kW+
-- extreme thermal density thresholds
+As GPU clusters scale, performance is no longer limited only by model architecture or software efficiency. It is increasingly constrained by:
 
-Traditional CFD simulations are:
-- computationally expensive
-- difficult to run in real time
-- poorly suited for live infrastructure monitoring
+- rack power density
+- liquid cooling capacity
+- heat propagation across infrastructure zones
+- thermal reliability
+- energy efficiency
+- operational response time
 
-LiquidFlow AI addresses this problem using:
-- physics-informed simulation
-- thermal surrogate modeling
-- infrastructure AI
-- multimodal thermal analysis
+Traditional CFD simulations are powerful but often too heavy for real-time operational monitoring.
 
-The result is a lightweight thermal intelligence system capable of:
-- predicting hotspot formation
-- estimating thermal risk
-- optimizing cooling configurations
-- assisting infrastructure operators in real time
+LiquidFlow AI explores a lightweight alternative:
+
+> physics-informed simulation + surrogate prediction + infrastructure optimization.
 
 ---
 
-# ⚡ Features
+## Current Capabilities
 
-## Thermal Intelligence Engine
-- Real-time liquid cooling simulation
-- Hotspot risk classification
+### Thermal Intelligence Engine
+
+- Single-rack liquid cooling simulation
+- Multi-rack thermal network modeling
+- Rack-to-rack heat propagation
 - Thermal risk scoring
 - Cooling margin estimation
-- Infrastructure anomaly detection
+- Cluster-level thermal status
 
-## AI Optimization System
+### Infrastructure Optimization
+
 - Cooling parameter optimization
-- Recommended flow rate estimation
-- Thermal mitigation suggestions
-- Before vs optimized thermal comparison
+- Flow rate recommendation
+- Cooling efficiency adjustment
+- Rack risk classification
+- Workload redistribution recommendations
 
-## Multimodal Vision Workflow
-- Thermal image upload
-- AI hotspot overlays
+### Forecasting
+
+- Thermal drift forecast
+- Future hotspot risk estimation
+- Peak temperature prediction
+- Escalation detection under sustained workload
+
+### Multimodal Inspection Workflow
+
+- Rack or thermal image upload
+- Hotspot overlay
+- Detection confidence scoring
 - Infrastructure inspection simulation
-- Thermal risk annotations
-- Vision-based infrastructure interpretation
 
-## Infrastructure Dashboard
-- Streamlit interface
-- Live infrastructure event stream
-- Dynamic thermal propagation visualization
-- Scenario-driven infrastructure simulations
-- AI infrastructure copilot
+### API Layer
 
-## Backend API
-- FastAPI thermal simulation endpoints
-- Optimization API
-- Infrastructure metrics
-- Surrogate thermal prediction module
+FastAPI endpoints include:
+
+- `/simulate`
+- `/optimize`
+- `/cluster-status`
+- `/rack/{rack_id}`
+- `/thermal-forecast`
+- `/energy-optimization`
+- `/recommend`
+- `/health`
 
 ---
 
-# 🏢 Infrastructure Scenarios
+## Infrastructure Scenarios
 
-LiquidFlow AI includes multiple AI infrastructure operating scenarios:
+LiquidFlow AI includes multiple operating scenarios:
 
 - Balanced AI Training Rack
 - High-Density MI300X Cluster
 - Cooling Loop Degradation
 - Emergency Thermal Event
 
-These scenarios simulate real-world thermal stress conditions commonly found in modern AI data centers.
+Each scenario changes heat load, coolant flow, cooling efficiency, degradation factor, and cluster-level thermal behavior.
 
 ---
 
-# 🧩 System Architecture
+## System Architecture
 
 ```text
-User Input
-    ↓
-Streamlit Dashboard
-    ↓
-FastAPI Backend
-    ↓
+User Input / Infrastructure Scenario
+        ↓
+Streamlit Dashboard + FastAPI API
+        ↓
 Thermal Simulation Engine
-    ↓
-Surrogate Prediction Layer
-    ↓
-Hotspot Detection + Risk Scoring
-    ↓
-Optimization Engine
-    ↓
-Vision AI Analysis
-    ↓
+        ↓
+Multi-Rack Propagation Model
+        ↓
+Surrogate Risk Prediction
+        ↓
+Thermal Forecasting Layer
+        ↓
+Cooling Optimization Engine
+        ↓
 AI Infrastructure Recommendations
+        ↓
+Operator Decision Support
 ```
 
 ---
 
-# 🖥️ Demo Workflow
+## Tech Stack
 
-1. Select an infrastructure scenario
-2. Configure cooling parameters
-3. Run thermal simulation
-4. Detect hotspot risk
-5. Visualize thermal propagation
-6. Optimize cooling performance
-7. Upload infrastructure image
-8. Run multimodal thermal analysis
-9. Generate AI-assisted recommendations
+### Core
 
----
-
-# 📸 Demo Preview
-
-## High-Risk Thermal Scenario
-
-<img src="screenshots/dashboard-high-risk-demo.png" width="950"/>
-
----
-
-# 🛠️ Tech Stack
-
-## Core
 - Python
 - Streamlit
 - FastAPI
 - NumPy
+- Pandas
 - Matplotlib
 - Pillow
 
-## AI / ML
-- Surrogate thermal prediction
+### AI / Simulation
+
+- Physics-informed thermal logic
+- Surrogate risk prediction
+- Multi-rack propagation model
+- Forecasting heuristics
 - PINN-ready architecture
-- Infrastructure optimization engine
 
-## Vision AI
-- AI-style hotspot overlays
-- Detection confidence scores
-- Multimodal infrastructure workflow
-- Prototype vision inspection logic
-- Future Qwen-VL integration through AMD Developer Cloud or Hugging Face inference
-- Future Llama Vision integration through cloud GPU inference
+### Infrastructure Roadmap
 
-## Infrastructure
-- AMD Developer Cloud roadmap
-- ROCm acceleration roadmap
-- Hugging Face deployment roadmap
+- GPU telemetry ingestion
+- ROCm acceleration
+- AMD Instinct GPU support
+- Qwen-VL or Llama Vision integration
+- Workload-aware thermal optimization
+- Energy-aware compute orchestration
 
 ---
 
-# ⚙️ Run Locally
+## Run Locally
 
-## Clone Repository
+### Clone Repository
 
 ```bash
 git clone https://github.com/hassanattout/liquidflow-ai.git
 cd liquidflow-ai
 ```
 
----
-
-## Install Dependencies
+### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-# ▶️ Run FastAPI Backend
+### Run FastAPI Backend
 
 ```bash
 python3 -m uvicorn app.main:app --reload
@@ -210,9 +182,7 @@ Open:
 http://127.0.0.1:8000/docs
 ```
 
----
-
-# ▶️ Run Streamlit Dashboard
+### Run Streamlit Dashboard
 
 ```bash
 streamlit run dashboard/app.py
@@ -220,88 +190,77 @@ streamlit run dashboard/app.py
 
 ---
 
-# 🔬 Why This Matters
+## Example API Calls
 
-Cooling is becoming one of the largest bottlenecks in next-generation AI infrastructure.
+### Single Rack Simulation
 
-LiquidFlow AI explores how:
-- physics-informed AI
-- multimodal reasoning
-- surrogate modeling
-- thermal optimization
+```bash
+curl "http://127.0.0.1:8000/simulate?flow_rate=12&inlet_temp=20&heat_load_kw=150&cooling_efficiency=0.82"
+```
 
-can improve:
-- infrastructure efficiency
-- hardware reliability
-- cooling performance
-- operational intelligence
+### Cluster Status
 
-for future AI systems.
+```bash
+curl "http://127.0.0.1:8000/cluster-status?base_heat_load_kw=180&degradation_factor=0.4"
+```
 
----
+### Thermal Forecast
 
-# 🔴 Why AMD
-
-LiquidFlow AI is highly aligned with AMD’s AI infrastructure ecosystem.
-
-Potential AMD acceleration pathways include:
-
-- Physics-informed neural network training on AMD Instinct GPUs
-- ROCm-accelerated thermal simulation workloads
-- High-throughput multimodal inference
-- Infrastructure-scale optimization systems
-- Real-time thermal digital twins for AI clusters
-
-The project is being developed using AMD Developer Cloud resources as part of the AMD Developer Hackathon.
+```bash
+curl "http://127.0.0.1:8000/thermal-forecast?current_max_temp=34&cooling_efficiency=0.75&heat_load_kw=220"
+```
 
 ---
 
-# ⚠️ Current Prototype Status
+## Why This Matters
 
-The current version uses physics-based simulation logic, a surrogate prediction module, optimization heuristics, and AI-style vision overlays.
+AI infrastructure is becoming an energy and thermal systems problem.
 
-The multimodal vision module currently provides prototype infrastructure inspection behavior. Future versions will connect to Qwen-VL or Llama Vision through AMD Developer Cloud, ROCm-compatible inference, or Hugging Face deployment.
+LiquidFlow AI explores how physically grounded software can support:
 
----
+- infrastructure reliability
+- cooling optimization
+- GPU cluster operations
+- data center energy efficiency
+- thermal risk forecasting
+- operator decision support
 
-# 🧠 Future Roadmap
-
-## Physics-Informed AI
-- Full PINN integration
-- PDE-constrained learning
-- Real thermal field prediction
-
-## Multimodal AI
-- Qwen-VL integration
-- Llama Vision integration
-- Natural language infrastructure reasoning
-
-## Infrastructure Intelligence
-- GPU telemetry ingestion
-- Multi-rack orchestration
-- Distributed cooling optimization
-- Infrastructure anomaly forecasting
-- AI operations copilot
-
-## Deployment
-- Hugging Face Spaces deployment
-- AMD GPU inference deployment
-- ROCm optimization
+The long-term vision is an AI infrastructure operating layer that connects telemetry, thermal simulation, workload orchestration, and energy optimization.
 
 ---
 
-# 🤝 Built For
+## Current Prototype Status
 
-- AI infrastructure research
-- GPU cooling optimization
-- Industrial AI systems
-- Thermal digital twins
-- Infrastructure intelligence
-- Scientific machine learning
-- Physics-informed AI workflows
+LiquidFlow AI is a functional prototype.
+
+Current version includes deterministic thermal simulation, multi-rack propagation, surrogate risk estimation, forecasting heuristics, API endpoints, and a Streamlit dashboard.
+
+Future versions can integrate real telemetry, CFD-calibrated models, neural surrogates, PINNs, and GPU-accelerated inference.
 
 ---
 
-# 📄 License
+## Roadmap
 
-MIT License
+### Near Term
+
+- Improve multi-rack thermal physics
+- Add real telemetry schema
+- Add workload scheduling logic
+- Improve dashboard UI polish
+- Add architecture diagrams and demo video
+
+### Medium Term
+
+- Train neural surrogate model
+- Add PINN-based thermal field prediction
+- Add GPU telemetry ingestion
+- Integrate external inference endpoint
+- Deploy stronger API backend
+
+### Long Term
+
+- Workload-aware thermal orchestration
+- Energy-aware AI cluster optimization
+- Cooling loop control recommendations
+- Data center digital twin
+- AI infrastructure operating system

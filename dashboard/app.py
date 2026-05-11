@@ -3,13 +3,26 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from simulations.thermal import thermal
-from models.surrogate_model import surrogate_temperature_prediction
+from simulations.thermal import (
+    thermal,
+    classify_hotspot,
+    calculate_risk_score,
+    generate_rack_cluster,
+    apply_neighbor_heat_propagation,
+    cluster_summary,
+    forecast_cluster_temperature,
+    get_cluster_recommendations,
+)
+from models.surrogate_model import (
+    surrogate_temperature_prediction,
+    surrogate_cluster_risk_prediction,
+)
 
 
 st.set_page_config(
@@ -17,14 +30,6 @@ st.set_page_config(
     page_icon="💧",
     layout="wide",
 )
-
-
-def classify_hotspot(outlet_temp: float) -> str:
-    return "HIGH" if outlet_temp > 30 else "LOW"
-
-
-def calculate_risk_score(outlet_temp: float) -> int:
-    return min(100, max(0, round(((outlet_temp - 20) / 30) * 100)))
 
 
 def optimize_cooling(
@@ -84,14 +89,18 @@ def optimize_cooling(
     return best_result
 
 
-def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int) -> tuple[Image.Image, list[dict]]:
+def draw_hotspot_overlay(
+    image: Image.Image,
+    hotspot_risk: str,
+    risk_score: int,
+) -> tuple[Image.Image, list[dict]]:
     image = image.convert("RGB")
     overlay = image.copy()
     draw = ImageDraw.Draw(overlay)
 
     width, height = overlay.size
 
-    if hotspot_risk == "HIGH":
+    if hotspot_risk in ["HIGH", "CRITICAL"]:
         detections = [
             {
                 "label": "Primary Hotspot",
@@ -137,11 +146,6 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
         severity = detection["severity"]
         confidence = detection["confidence"]
 
-        if severity in ["Critical", "High"]:
-            color = (255, 0, 0)
-        else:
-            color = (0, 255, 0)
-
         draw.rectangle(box, outline=(255, 40, 40), width=10)
 
         text = f"{label} | {severity} | {round(confidence * 100)}%"
@@ -151,7 +155,7 @@ def draw_hotspot_overlay(image: Image.Image, hotspot_risk: str, risk_score: int)
             [
                 text_position[0],
                 text_position[1],
-                min(width, text_position[0] + 360),
+                min(width, text_position[0] + 380),
                 text_position[1] + 24,
             ],
             fill="black",
@@ -168,69 +172,55 @@ SCENARIOS = {
         "inlet_temp": 20.0,
         "heat_load_kw": 100.0,
         "cooling_efficiency": 0.85,
+        "cluster_heat_kw": 140.0,
+        "degradation": 0.0,
     },
     "High-Density MI300X Cluster": {
         "flow_rate": 8.0,
         "inlet_temp": 24.0,
         "heat_load_kw": 260.0,
         "cooling_efficiency": 0.55,
+        "cluster_heat_kw": 220.0,
+        "degradation": 0.35,
     },
     "Cooling Loop Degradation": {
         "flow_rate": 5.0,
         "inlet_temp": 28.0,
         "heat_load_kw": 220.0,
         "cooling_efficiency": 0.40,
+        "cluster_heat_kw": 190.0,
+        "degradation": 0.65,
     },
     "Emergency Thermal Event": {
         "flow_rate": 3.0,
         "inlet_temp": 32.0,
         "heat_load_kw": 300.0,
         "cooling_efficiency": 0.25,
+        "cluster_heat_kw": 260.0,
+        "degradation": 0.9,
     },
 }
 
 
-logo_path = Path("assets/liquidflow-logo.png")
-
-if logo_path.exists():
-    logo = Image.open(logo_path)
-    st.image(logo, width=90)
-else:
-    st.markdown("# 💧")
-
 st.markdown(
     """
     <h1 style='font-size: 4rem; margin-bottom: 0;'>
-        LiquidFlow AI
+        💧 LiquidFlow AI
     </h1>
 
     <p style='font-size: 1.2rem; color: #9aa0aa;'>
-        Physics-informed thermal intelligence for high-density AI infrastructure
+        Thermal intelligence layer for high-density AI infrastructure
     </p>
     """,
     unsafe_allow_html=True,
 )
 
-st.success("System online • Thermal digital twin active • AI monitoring enabled")
+st.success("System online • Thermal digital twin active • AI infrastructure monitoring enabled")
 
-c1, c2, c3 = st.columns(3)
-
-with c1:
-    st.success("Cooling Network Active")
-
-with c2:
-    st.success("AI Monitoring Online")
-
-with c3:
-    st.success("Thermal Twin Synced")
-
-st.divider()
 
 with st.sidebar:
     st.markdown("## ⚙️ Control Panel")
     st.caption("Thermal system configuration")
-
-    st.header("System Inputs")
 
     selected_scenario = st.selectbox(
         "Infrastructure Scenario",
@@ -254,7 +244,7 @@ with st.sidebar:
     )
 
     heat_load_kw = st.slider(
-        "Heat load kW",
+        "Single-rack heat load kW",
         10.0,
         300.0,
         float(scenario["heat_load_kw"]),
@@ -267,6 +257,27 @@ with st.sidebar:
         float(scenario["cooling_efficiency"]),
     )
 
+    cooling_degradation_factor = st.slider(
+        "Cooling Degradation Factor",
+        0.0,
+        1.0,
+        float(scenario["degradation"]),
+    )
+
+    st.divider()
+
+    st.markdown("## 🏢 Cluster Model")
+
+    n_rows = st.slider("Rack rows", 2, 6, 3)
+    n_cols = st.slider("Rack columns", 2, 8, 4)
+
+    cluster_heat_kw = st.slider(
+        "Average rack heat load kW",
+        50.0,
+        300.0,
+        float(scenario["cluster_heat_kw"]),
+    )
+
     st.divider()
 
     uploaded_image = st.file_uploader(
@@ -275,18 +286,23 @@ with st.sidebar:
     )
 
 
+effective_efficiency = max(
+    0.15,
+    cooling_efficiency * (1.0 - cooling_degradation_factor * 0.55),
+)
+
 outlet_temp = thermal(
     flow_rate,
     inlet_temp,
     heat_load_kw,
-    cooling_efficiency,
+    effective_efficiency,
 )
 
 surrogate_prediction = surrogate_temperature_prediction(
     flow_rate,
     inlet_temp,
     heat_load_kw,
-    cooling_efficiency,
+    effective_efficiency,
 )
 
 if outlet_temp is None:
@@ -299,7 +315,7 @@ surrogate_prediction = round(float(surrogate_prediction), 2)
 hotspot_risk = classify_hotspot(outlet_temp)
 risk_score = calculate_risk_score(outlet_temp)
 cooling_margin = round(max(0, 50 - outlet_temp), 2)
-estimated_efficiency = round(cooling_efficiency * 100, 1)
+estimated_efficiency = round(effective_efficiency * 100, 1)
 
 k1, k2, k3, k4, k5 = st.columns(5)
 
@@ -311,13 +327,216 @@ k5.metric("Surrogate Prediction", f"{surrogate_prediction} °C")
 
 st.divider()
 
+st.subheader("🏢 Multi-Rack Thermal Network")
+
+racks = generate_rack_cluster(
+    n_rows=n_rows,
+    n_cols=n_cols,
+    base_heat_load_kw=cluster_heat_kw,
+    base_flow_rate=flow_rate,
+    inlet_temp=inlet_temp,
+    cooling_efficiency=effective_efficiency,
+    degradation_factor=cooling_degradation_factor,
+)
+
+racks = apply_neighbor_heat_propagation(racks, n_rows=n_rows, n_cols=n_cols)
+summary = cluster_summary(racks)
+cluster_surrogate = surrogate_cluster_risk_prediction(racks)
+
+c1, c2, c3, c4, c5 = st.columns(5)
+
+c1.metric("Cluster Status", summary["cluster_status"])
+c2.metric("Rack Count", summary["rack_count"])
+c3.metric("Total Heat Load", f"{summary['total_heat_load_kw']} kW")
+c4.metric("Max Rack Temp", f"{summary['max_outlet_temp_c']} °C")
+c5.metric("Critical Racks", summary["critical_rack_count"])
+
+rack_df = pd.DataFrame(racks)
+pivot_temp = rack_df.pivot(index="row", columns="col", values="propagated_outlet_temp")
+
+left_cluster, right_cluster = st.columns([1.2, 1])
+
+with left_cluster:
+    fig_cluster, ax_cluster = plt.subplots(figsize=(8, 4.5))
+
+    heatmap = ax_cluster.imshow(pivot_temp.values, aspect="auto")
+    plt.colorbar(heatmap, ax=ax_cluster, label="Propagated outlet temperature °C")
+
+    for i in range(pivot_temp.shape[0]):
+        for j in range(pivot_temp.shape[1]):
+            temp = pivot_temp.values[i, j]
+            rack_id = f"R{i + 1}-{j + 1}"
+
+            rack_risk = rack_df.loc[
+                rack_df["rack_id"] == rack_id,
+                "propagated_hotspot_risk",
+            ].iloc[0]
+
+            label = f"Rack {rack_id}\n{temp:.1f}°C"
+
+            if rack_risk == "CRITICAL":
+                label += "\nCRITICAL"
+
+            ax_cluster.text(
+                j,
+                i,
+                label,
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="red" if rack_risk == "CRITICAL" else "white",
+                fontweight="bold",
+            )
+
+    ax_cluster.set_title("Rack-to-Rack Thermal Propagation Map")
+
+    for row in range(n_rows):
+        ax_cluster.arrow(
+            -0.48,
+            row,
+            0.18,
+            0,
+            head_width=0.08,
+            head_length=0.08,
+            fc="cyan",
+            ec="cyan",
+            linewidth=2,
+            alpha=0.75,
+        )
+
+    ax_cluster.text(
+        -0.62,
+        -0.60,
+        "Cold Aisle",
+        fontsize=10,
+        color="cyan",
+        fontweight="bold",
+    )
+
+    ax_cluster.text(
+        n_cols - 0.7,
+        n_rows - 0.35,
+        "Hot Zone",
+        fontsize=10,
+        color="red",
+        fontweight="bold",
+    )
+
+    ax_cluster.set_xlabel("Cluster Column")
+    ax_cluster.set_ylabel("Cluster Row")
+    st.pyplot(fig_cluster)
+
+with right_cluster:
+    st.markdown("### 🧠 Cluster Intelligence")
+
+    if summary["cluster_status"] == "CRITICAL":
+        st.error("Cluster-level thermal risk is critical.")
+    elif summary["cluster_status"] == "WATCH":
+        st.warning("Cluster requires proactive monitoring.")
+    else:
+        st.success("Cluster operating within stable thermal conditions.")
+
+    st.write(
+        f"Surrogate hotspot probability: "
+        f"**{cluster_surrogate['cluster_hotspot_probability']}**"
+    )
+    st.write(f"Main risk driver: **{cluster_surrogate['risk_driver']}**")
+
+    st.write("Recommended actions:")
+    for rec in get_cluster_recommendations(summary):
+        st.write(f"• {rec}")
+
+with st.expander("View rack telemetry table"):
+    st.dataframe(
+        rack_df[
+            [
+                "rack_id",
+                "heat_load_kw",
+                "flow_rate",
+                "cooling_efficiency",
+                "outlet_temp",
+                "propagated_outlet_temp",
+                "propagated_hotspot_risk",
+                "propagated_risk_score",
+            ]
+        ],
+        use_container_width=True,
+    )
+
+st.divider()
+
+st.subheader("🔮 Thermal Forecast")
+
+forecast = forecast_cluster_temperature(
+    current_max_temp=summary["max_outlet_temp_c"],
+    cooling_efficiency=effective_efficiency,
+    heat_load_kw=cluster_heat_kw,
+    steps=24,
+)
+
+forecast_df = pd.DataFrame(forecast)
+
+f1, f2 = st.columns([1.2, 1])
+
+with f1:
+    fig_forecast, ax_forecast = plt.subplots(figsize=(8, 3.5))
+
+    ax_forecast.plot(
+        forecast_df["time_step"],
+        forecast_df["predicted_max_temp_c"],
+        marker="o",
+    )
+
+    ax_forecast.axhline(
+        32,
+        linestyle="--",
+        color="orange",
+        label="High-risk threshold",
+    )
+
+    ax_forecast.axhline(
+        42,
+        linestyle="--",
+        color="red",
+        label="Critical threshold",
+    )
+
+    ax_forecast.fill_between(
+        forecast_df["time_step"],
+        42,
+        forecast_df["predicted_max_temp_c"],
+        where=forecast_df["predicted_max_temp_c"] >= 42,
+        alpha=0.2,
+        color="red",
+    )
+
+    ax_forecast.set_title("Predicted Cluster Thermal Drift")
+    ax_forecast.set_xlabel("Forecast Step")
+    ax_forecast.set_ylabel("Max Temperature °C")
+    ax_forecast.legend()
+
+    st.pyplot(fig_forecast)
+
+with f2:
+    peak = forecast_df.loc[forecast_df["predicted_max_temp_c"].idxmax()]
+
+    st.metric("Peak Forecast Temp", f"{peak['predicted_max_temp_c']} °C")
+    st.metric("Peak Forecast Risk", peak["risk_class"])
+
+    if peak["risk_class"] in ["HIGH", "CRITICAL"]:
+        st.warning("Forecast indicates possible thermal escalation under sustained load.")
+    else:
+        st.success("Forecast remains within acceptable range.")
+
+st.divider()
+
 st.subheader("⚡ Cooling Optimization Engine")
 
 optimized = optimize_cooling(
     flow_rate,
     inlet_temp,
     heat_load_kw,
-    cooling_efficiency,
+    effective_efficiency,
 )
 
 if optimized is not None:
@@ -352,66 +571,14 @@ if optimized is not None:
             f"{optimized['optimized_cooling_efficiency']}",
         )
 
-    before_after = {
-        "Current": outlet_temp,
-        "Optimized": optimized["optimized_outlet_temp"],
-    }
-
-    fig_opt, ax_opt = plt.subplots(figsize=(7, 3))
-    ax_opt.bar(before_after.keys(), before_after.values())
-    ax_opt.axhline(30, linestyle="--", label="Hotspot threshold")
-    ax_opt.set_ylabel("Outlet Temperature °C")
-    ax_opt.set_title("Current vs Optimized Cooling Performance")
-    ax_opt.legend()
-
-    st.pyplot(fig_opt)
-
-    st.success(
-        f"Optimization complete: risk transition {hotspot_risk} → "
-        f"{optimized['optimized_hotspot_risk']}, with {temp_reduction} °C "
-        "estimated temperature reduction."
-    )
-
 else:
     st.warning("Optimization engine could not find a valid cooling configuration.")
-
-st.divider()
-
-st.subheader("🏢 Infrastructure Scenario Intelligence")
-
-if selected_scenario == "Balanced AI Training Rack":
-    st.success(
-        "Nominal AI training workload detected. "
-        "Infrastructure operating within stable thermal conditions."
-    )
-
-elif selected_scenario == "High-Density MI300X Cluster":
-    st.warning(
-        "High-density accelerated compute workload detected. "
-        "Thermal stress increasing due to elevated rack power density."
-    )
-
-elif selected_scenario == "Cooling Loop Degradation":
-    st.error(
-        "Cooling degradation scenario detected. "
-        "Flow instability and reduced cooling efficiency may trigger hotspot formation."
-    )
-
-elif selected_scenario == "Emergency Thermal Event":
-    st.error(
-        "Critical infrastructure thermal event detected. "
-        "Immediate cooling intervention recommended to prevent hardware damage."
-    )
-
-st.caption("Scenario-driven infrastructure simulation for AI data center thermal analysis.")
 
 st.divider()
 
 st.subheader("🧪 Physics Model Comparison")
 
 baseline_error = round(abs(outlet_temp - surrogate_prediction), 2)
-
-st.write("Comparison between the thermal simulation engine and the surrogate prediction layer.")
 
 p1, p2, p3 = st.columns(3)
 
@@ -456,7 +623,7 @@ st.divider()
 left, right = st.columns([1.2, 1])
 
 with left:
-    st.subheader("🌡️ Thermal Field Simulation")
+    st.subheader("🌡️ Dynamic Thermal Field Simulation")
 
     x = np.linspace(0, 1, 100)
     y = np.linspace(0, 1, 100)
@@ -489,6 +656,13 @@ with left:
     plt.colorbar(heatmap, ax=ax, label="Temperature °C")
 
     ax.set_title("Dynamic Thermal Propagation Simulation")
+
+    for rack_x in np.linspace(0.1, 0.9, 5):
+        ax.axvline(rack_x, linestyle="--", alpha=0.25)
+
+    for rack_y in np.linspace(0.1, 0.9, 4):
+        ax.axhline(rack_y, linestyle="--", alpha=0.25)
+
     ax.set_xlabel("Rack Width")
     ax.set_ylabel("Rack Height")
 
@@ -497,8 +671,8 @@ with left:
 with right:
     st.subheader("🧠 AI Recommendation Engine")
 
-    if hotspot_risk == "HIGH":
-        st.error("Critical hotspot formation detected")
+    if hotspot_risk in ["HIGH", "CRITICAL"]:
+        st.error("Hotspot formation detected")
 
         st.write("Recommended actions:")
         st.write("• Increase coolant flow rate by 15-25%")
@@ -506,6 +680,14 @@ with right:
         st.write("• Improve cooling loop efficiency")
         st.write("• Redistribute thermal load across racks")
         st.write("• Inspect cooling plate thermal contact")
+
+    elif hotspot_risk == "WARNING":
+        st.warning("Early thermal stress detected")
+
+        st.write("Recommended actions:")
+        st.write("• Increase monitoring frequency")
+        st.write("• Prepare cooling adjustment if workload rises")
+        st.write("• Watch forecasted thermal drift")
 
     else:
         st.success("System operating within acceptable thermal range")
@@ -515,34 +697,18 @@ with right:
         st.write("• Continue monitoring outlet temperature")
         st.write("• No immediate intervention required")
 
-    st.divider()
-
-    st.subheader("🏗️ Infrastructure AI Insight")
-
-    if outlet_temp > 40:
-        st.warning(
-            "Predicted thermal behavior suggests elevated infrastructure stress "
-            "and possible reduction in hardware lifespan under sustained operation."
-        )
-    elif outlet_temp > 30:
-        st.info(
-            "Moderate thermal stress detected. Long-duration workloads may benefit "
-            "from proactive cooling optimization."
-        )
-    else:
-        st.success("Thermal operating conditions appear stable for sustained AI workloads.")
-
 st.divider()
 
 st.subheader("👁️ Multimodal Thermal Image Analysis")
 
 if uploaded_image is not None:
     image = Image.open(uploaded_image)
+
     annotated_image, detections = draw_hotspot_overlay(
-    image,
-    hotspot_risk,
-    risk_score,
-)
+        image,
+        hotspot_risk,
+        risk_score,
+    )
 
     img1, img2 = st.columns(2)
 
@@ -559,7 +725,7 @@ if uploaded_image is not None:
             caption="AI hotspot overlay",
             use_container_width=True,
         )
-    
+
     st.subheader("🔎 Vision Detection Results")
 
     for detection in detections:
@@ -571,39 +737,6 @@ if uploaded_image is not None:
 
     st.success("Vision analysis pipeline active")
 
-    st.write("Detected infrastructure observations:")
-
-    observations = [
-        "Localized thermal concentration detected",
-        "Cooling asymmetry identified near rack boundary",
-        "Potential hotspot propagation risk",
-        "Thermal gradient exceeds nominal threshold",
-        "Infrastructure cooling optimization recommended",
-    ]
-
-    for obs in observations:
-        st.write(f"• {obs}")
-
-    st.divider()
-
-    st.subheader("🧠 Vision AI Interpretation")
-
-    if hotspot_risk == "HIGH":
-        st.warning(
-            "The uploaded infrastructure image suggests elevated thermal accumulation "
-            "consistent with high-density GPU workloads and insufficient cooling dispersion."
-        )
-    else:
-        st.success(
-            "The uploaded infrastructure image indicates relatively stable cooling "
-            "behavior with acceptable thermal distribution."
-        )
-
-    st.caption(
-        "Prototype multimodal workflow. Future versions will integrate Qwen-VL "
-        "or Llama Vision models running on AMD GPUs."
-    )
-
 else:
     st.write(
         "Upload a rack, cooling plate, or thermal image to activate the multimodal analysis module."
@@ -613,25 +746,31 @@ st.divider()
 
 st.subheader("📡 Live Infrastructure Event Stream")
 
-if hotspot_risk == "HIGH":
+if summary["cluster_status"] == "CRITICAL":
     events = [
-        "WARNING • Hotspot threshold exceeded",
-        "ALERT • Cooling efficiency degradation detected",
-        "ACTION • AI recommendation engine triggered",
-        "INFO • Thermal propagation increasing near rack boundary",
+        "ALERT • Cluster thermal status critical",
+        "WARNING • Multi-rack hotspot propagation detected",
+        "ACTION • Workload redistribution recommended",
+        "ACTION • Increase coolant flow in affected cooling loop",
+    ]
+elif summary["cluster_status"] == "WATCH":
+    events = [
+        "WARNING • Early-stage rack thermal imbalance detected",
+        "INFO • Forecast model monitoring thermal drift",
+        "ACTION • Proactive cooling adjustment recommended",
     ]
 else:
     events = [
-        "INFO • Thermal conditions stable",
+        "INFO • Cluster thermal conditions stable",
         "INFO • Cooling network operating normally",
-        "INFO • AI monitoring active",
-        "INFO • No critical infrastructure anomalies detected",
+        "INFO • AI infrastructure monitoring active",
     ]
 
 events.extend(
     [
         f"METRIC • GPU utilization at {gpu_utilization}%",
-        f"METRIC • Estimated rack power at {heat_load_kw} kW",
+        f"METRIC • Single rack power at {heat_load_kw} kW",
+        f"METRIC • Cluster heat load at {summary['total_heat_load_kw']} kW",
         f"METRIC • Cooling loop pressure at {cooling_pressure} bar",
     ]
 )
@@ -641,69 +780,36 @@ for event in events:
 
 st.divider()
 
-st.subheader("📈 Thermal Anomaly Trend")
-
-time_steps = np.arange(1, 21)
-
-thermal_trend = (
-    inlet_temp
-    + (outlet_temp - inlet_temp) * (time_steps / 20)
-    + 2 * np.sin(time_steps / 2)
-)
-
-fig_trend, ax_trend = plt.subplots(figsize=(8, 3))
-
-ax_trend.plot(time_steps, thermal_trend, marker="o")
-ax_trend.axhline(30, linestyle="--", label="Hotspot threshold")
-ax_trend.set_title("Predicted Thermal Risk Evolution")
-ax_trend.set_xlabel("Time Step")
-ax_trend.set_ylabel("Temperature °C")
-ax_trend.legend()
-
-st.pyplot(fig_trend)
-
-st.divider()
-
-st.subheader("📘 Project Summary")
-
-st.write(
-    "LiquidFlow AI is a physics-informed thermal intelligence platform for next-generation "
-    "AI infrastructure. It simulates liquid cooling behavior, predicts hotspot risk, "
-    "visualizes thermal fields, and provides AI-assisted cooling recommendations."
-)
-
-st.divider()
-
 st.subheader("🤖 LiquidFlow AI Copilot")
 
 user_question = st.text_input(
     "Ask the thermal AI assistant",
-    placeholder="Example: Why is hotspot risk high?",
+    placeholder="Example: Why is cluster thermal risk high?",
 )
 
 if user_question:
     st.write("AI Copilot Response:")
 
-    if hotspot_risk == "HIGH":
+    if summary["cluster_status"] == "CRITICAL":
         st.warning(
-            "The system is detecting high thermal risk because the predicted outlet "
-            "temperature exceeds the safe operating threshold. The most effective first "
-            "actions are increasing coolant flow, improving cooling efficiency, or reducing "
-            "rack heat load."
+            "The cluster is showing critical thermal behavior because multiple racks are exceeding safe operating margins. "
+            "The strongest first action is to redistribute workload away from hot racks while increasing coolant flow and inspecting the affected cooling loop."
+        )
+    elif summary["cluster_status"] == "WATCH":
+        st.info(
+            "The cluster is showing early thermal imbalance. Sustained high-density workloads could escalate risk, so proactive cooling adjustment is recommended."
         )
     else:
         st.success(
-            "The system is currently operating within the acceptable thermal range. "
-            "Cooling margin is positive and no immediate intervention is required."
+            "The cluster is currently operating within acceptable thermal limits. Cooling margin is positive and no immediate intervention is required."
         )
 
     st.caption(
-        "Prototype copilot logic. Future version can connect to Qwen, Llama, or AMD-hosted inference APIs."
+        "Prototype copilot logic. Future versions can connect to Qwen, Llama, or AMD-hosted inference APIs."
     )
 
 st.divider()
 
 st.caption(
-    "LiquidFlow AI • Built for the AMD Developer Hackathon • "
-    "Physics-informed infrastructure intelligence"
+    "LiquidFlow AI • Physics-informed infrastructure intelligence for high-density AI systems"
 )

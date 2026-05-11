@@ -1,27 +1,31 @@
 import numpy as np
 from fastapi import FastAPI, Query
 
-from simulations.thermal import thermal
-from models.surrogate_model import surrogate_temperature_prediction
+from simulations.thermal import (
+    thermal,
+    classify_hotspot,
+    calculate_risk_score,
+    generate_rack_cluster,
+    apply_neighbor_heat_propagation,
+    cluster_summary,
+    forecast_cluster_temperature,
+    get_cluster_recommendations,
+)
+from models.surrogate_model import (
+    surrogate_temperature_prediction,
+    surrogate_cluster_risk_prediction,
+)
 
 
 app = FastAPI(
     title="LiquidFlow AI",
     description="Physics-informed thermal intelligence API for high-density AI infrastructure.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 
-def classify_hotspot(outlet_temp: float) -> str:
-    return "HIGH" if outlet_temp > 30 else "LOW"
-
-
-def calculate_risk_score(outlet_temp: float) -> int:
-    return min(100, max(0, round(((outlet_temp - 20) / 30) * 100)))
-
-
 def get_recommendations(hotspot_risk: str) -> list[str]:
-    if hotspot_risk == "HIGH":
+    if hotspot_risk in ["HIGH", "CRITICAL"]:
         return [
             "Increase coolant flow rate by 15-25%",
             "Reduce rack compute density",
@@ -30,11 +34,19 @@ def get_recommendations(hotspot_risk: str) -> list[str]:
             "Inspect cooling plate thermal contact",
         ]
 
+    if hotspot_risk == "WARNING":
+        return [
+            "Increase monitoring frequency",
+            "Prepare cooling adjustment if workload increases",
+            "Check cooling margin during sustained training workloads",
+        ]
+
     return [
         "Maintain current cooling configuration",
         "Continue monitoring outlet temperature",
         "No immediate intervention required",
     ]
+
 
 def optimize_cooling(
     flow_rate: float,
@@ -88,15 +100,20 @@ def optimize_cooling(
 
     return best_result
 
+
 @app.get("/")
 def home():
     return {
         "project": "LiquidFlow AI",
         "status": "running",
+        "version": "0.2.0",
         "description": "Thermal digital twin for AI infrastructure cooling.",
         "docs": "/docs",
         "health": "/health",
         "simulate": "/simulate",
+        "optimize": "/optimize",
+        "cluster_status": "/cluster-status",
+        "thermal_forecast": "/thermal-forecast",
     }
 
 
@@ -252,6 +269,130 @@ def optimize(
         "improvement": {
             "temperature_reduction_c": temp_reduction,
             "risk_score_reduction": risk_reduction,
-            "risk_transition": f"{current_risk} → {optimized['optimized_hotspot_risk']}",
+            "risk_transition": f"{current_risk} -> {optimized['optimized_hotspot_risk']}",
         },
+    }
+
+
+@app.get("/cluster-status")
+def cluster_status(
+    n_rows: int = Query(3, ge=2, le=6),
+    n_cols: int = Query(4, ge=2, le=8),
+    base_heat_load_kw: float = Query(140.0, gt=10),
+    base_flow_rate: float = Query(12.0, gt=0),
+    inlet_temp: float = Query(20.0),
+    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    degradation_factor: float = Query(0.0, ge=0, le=1),
+):
+    racks = generate_rack_cluster(
+        n_rows=n_rows,
+        n_cols=n_cols,
+        base_heat_load_kw=base_heat_load_kw,
+        base_flow_rate=base_flow_rate,
+        inlet_temp=inlet_temp,
+        cooling_efficiency=cooling_efficiency,
+        degradation_factor=degradation_factor,
+    )
+
+    propagated = apply_neighbor_heat_propagation(racks, n_rows=n_rows, n_cols=n_cols)
+    summary = cluster_summary(propagated)
+    surrogate_risk = surrogate_cluster_risk_prediction(propagated)
+
+    return {
+        "status": "success",
+        "project": "LiquidFlow AI",
+        "cluster_summary": summary,
+        "surrogate_cluster_risk": surrogate_risk,
+        "recommendations": get_cluster_recommendations(summary),
+        "racks": propagated,
+    }
+
+
+@app.get("/rack/{rack_id}")
+def rack_detail(
+    rack_id: str,
+    n_rows: int = Query(3, ge=2, le=6),
+    n_cols: int = Query(4, ge=2, le=8),
+    base_heat_load_kw: float = Query(140.0, gt=10),
+    base_flow_rate: float = Query(12.0, gt=0),
+    inlet_temp: float = Query(20.0),
+    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    degradation_factor: float = Query(0.0, ge=0, le=1),
+):
+    racks = generate_rack_cluster(
+        n_rows=n_rows,
+        n_cols=n_cols,
+        base_heat_load_kw=base_heat_load_kw,
+        base_flow_rate=base_flow_rate,
+        inlet_temp=inlet_temp,
+        cooling_efficiency=cooling_efficiency,
+        degradation_factor=degradation_factor,
+    )
+    propagated = apply_neighbor_heat_propagation(racks, n_rows=n_rows, n_cols=n_cols)
+
+    for rack in propagated:
+        if rack["rack_id"].lower() == rack_id.lower():
+            return {
+                "status": "success",
+                "rack": rack,
+                "recommendations": get_recommendations(rack["propagated_hotspot_risk"]),
+            }
+
+    return {
+        "status": "not_found",
+        "message": f"Rack {rack_id} not found",
+    }
+
+
+@app.get("/thermal-forecast")
+def thermal_forecast(
+    current_max_temp: float = Query(32.0),
+    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    heat_load_kw: float = Query(180.0, gt=10),
+    steps: int = Query(24, ge=4, le=96),
+):
+    forecast = forecast_cluster_temperature(
+        current_max_temp=current_max_temp,
+        cooling_efficiency=cooling_efficiency,
+        heat_load_kw=heat_load_kw,
+        steps=steps,
+    )
+
+    peak = max(forecast, key=lambda item: item["predicted_max_temp_c"])
+
+    return {
+        "status": "success",
+        "project": "LiquidFlow AI",
+        "forecast_horizon_steps": steps,
+        "peak_forecast": peak,
+        "forecast": forecast,
+    }
+
+
+@app.get("/energy-optimization")
+def energy_optimization(
+    total_heat_load_kw: float = Query(1200.0, gt=100),
+    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    utilization_percent: float = Query(75.0, ge=0, le=100),
+):
+    estimated_it_power_kw = total_heat_load_kw
+    cooling_overhead_kw = total_heat_load_kw * (1.0 - cooling_efficiency)
+    facility_power_kw = estimated_it_power_kw + cooling_overhead_kw
+    pue = round(facility_power_kw / estimated_it_power_kw, 3)
+
+    potential_savings_kw = round(cooling_overhead_kw * 0.18, 2)
+
+    return {
+        "status": "success",
+        "estimated_it_power_kw": round(estimated_it_power_kw, 2),
+        "cooling_overhead_kw": round(cooling_overhead_kw, 2),
+        "facility_power_kw": round(facility_power_kw, 2),
+        "estimated_pue": pue,
+        "potential_cooling_savings_kw": potential_savings_kw,
+        "recommendations": [
+            "Shift flexible workloads toward cooler racks",
+            "Increase cooling efficiency before raising facility power draw",
+            "Prioritize thermal balancing over uniform utilization",
+            "Monitor PUE drift during sustained high-utilization periods",
+        ],
     }
