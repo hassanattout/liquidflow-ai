@@ -1,8 +1,8 @@
-import numpy as np
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 
 from simulations.thermal import (
     thermal,
+    optimize_cooling,
     classify_hotspot,
     calculate_risk_score,
     generate_rack_cluster,
@@ -12,14 +12,14 @@ from simulations.thermal import (
     get_cluster_recommendations,
 )
 from models.surrogate_model import (
-    surrogate_temperature_prediction,
-    surrogate_cluster_risk_prediction,
+    heuristic_temperature_prediction,
+    heuristic_cluster_risk_prediction,
 )
 
 
 app = FastAPI(
     title="LiquidFlow AI",
-    description="Physics-informed thermal intelligence API for high-density AI infrastructure.",
+    description="Physics-based thermal intelligence prototype for high-density AI infrastructure.",
     version="0.2.0",
 )
 
@@ -48,59 +48,6 @@ def get_recommendations(hotspot_risk: str) -> list[str]:
     ]
 
 
-def optimize_cooling(
-    flow_rate: float,
-    inlet_temp: float,
-    heat_load_kw: float,
-    cooling_efficiency: float,
-) -> dict:
-    best_result = None
-
-    flow_options = np.linspace(flow_rate, min(flow_rate * 2.0, 50), 20)
-    inlet_options = np.linspace(max(inlet_temp - 8, 5), inlet_temp, 10)
-    efficiency_options = np.linspace(cooling_efficiency, min(cooling_efficiency + 0.15, 1.0), 10)
-
-    for candidate_flow in flow_options:
-        for candidate_inlet in inlet_options:
-            for candidate_efficiency in efficiency_options:
-                candidate_outlet = thermal(
-                    candidate_flow,
-                    candidate_inlet,
-                    heat_load_kw,
-                    candidate_efficiency,
-                )
-
-                if candidate_outlet is None:
-                    continue
-
-                candidate_outlet = round(float(candidate_outlet), 2)
-                candidate_risk = classify_hotspot(candidate_outlet)
-                candidate_score = calculate_risk_score(candidate_outlet)
-
-                penalty = (
-                    abs(candidate_flow - flow_rate) * 0.4
-                    + abs(candidate_inlet - inlet_temp) * 0.8
-                    + abs(candidate_efficiency - cooling_efficiency) * 20
-                )
-
-                objective = candidate_outlet + penalty
-
-                result = {
-                    "optimized_flow_rate": round(float(candidate_flow), 2),
-                    "optimized_inlet_temp": round(float(candidate_inlet), 2),
-                    "optimized_cooling_efficiency": round(float(candidate_efficiency), 2),
-                    "optimized_outlet_temp": candidate_outlet,
-                    "optimized_hotspot_risk": candidate_risk,
-                    "optimized_risk_score": candidate_score,
-                    "objective_score": round(float(objective), 2),
-                }
-
-                if best_result is None or objective < best_result["objective_score"]:
-                    best_result = result
-
-    return best_result
-
-
 @app.get("/")
 def home():
     return {
@@ -127,12 +74,12 @@ def health():
 
 @app.get("/simulate")
 def simulate(
-    flow_rate: float = Query(12.0, gt=0, description="Coolant flow rate"),
-    inlet_temp: float = Query(20.0, description="Inlet temperature in °C"),
-    heat_load_kw: float = Query(100.0, gt=0, description="Rack heat load in kW"),
+    flow_rate: float = Query(200.0, gt=0, le=1000, description="Coolant flow rate in L/min"),
+    inlet_temp: float = Query(20.0, ge=5, le=35, description="Inlet temperature in °C"),
+    heat_load_kw: float = Query(100.0, gt=0, le=500, description="Rack heat load in kW"),
     cooling_efficiency: float = Query(
         0.85,
-        gt=0,
+        ge=0.1,
         le=1,
         description="Cooling efficiency from 0 to 1",
     ),
@@ -144,13 +91,7 @@ def simulate(
         cooling_efficiency,
     )
 
-    if outlet_temp is None:
-        return {
-            "status": "error",
-            "message": "flow_rate * cooling_efficiency must be greater than 0",
-        }
-
-    surrogate_prediction = surrogate_temperature_prediction(
+    heuristic_prediction = heuristic_temperature_prediction(
         flow_rate,
         inlet_temp,
         heat_load_kw,
@@ -158,16 +99,15 @@ def simulate(
     )
 
     outlet_temp = round(float(outlet_temp), 2)
-    surrogate_prediction = round(float(surrogate_prediction), 2)
+    heuristic_prediction = round(float(heuristic_prediction), 2)
 
     hotspot_risk = classify_hotspot(outlet_temp)
     risk_score = calculate_risk_score(outlet_temp)
     cooling_margin = round(max(0, 50 - outlet_temp), 2)
-    model_difference = round(abs(outlet_temp - surrogate_prediction), 2)
+    model_difference = round(abs(outlet_temp - heuristic_prediction), 2)
 
     estimated_efficiency = round(cooling_efficiency * 100, 1)
     gpu_utilization = min(100, round((heat_load_kw / 300) * 100))
-    cooling_pressure = round(flow_rate * 0.42, 2)
     pue_estimate = round(1.1 + ((100 - estimated_efficiency) / 100), 2)
 
     return {
@@ -181,7 +121,7 @@ def simulate(
         },
         "results": {
             "outlet_temp": outlet_temp,
-            "surrogate_prediction": surrogate_prediction,
+            "heuristic_prediction": heuristic_prediction,
             "model_difference": model_difference,
             "hotspot_risk": hotspot_risk,
             "thermal_risk_score": risk_score,
@@ -189,9 +129,8 @@ def simulate(
         },
         "infrastructure_metrics": {
             "estimated_efficiency_percent": estimated_efficiency,
-            "estimated_gpu_utilization_percent": gpu_utilization,
-            "cooling_loop_pressure_bar": cooling_pressure,
-            "estimated_pue": pue_estimate,
+            "synthetic_load_proxy_percent": gpu_utilization,
+            "estimated_pue_proxy": pue_estimate,
         },
         "recommendations": get_recommendations(hotspot_risk),
     }
@@ -199,7 +138,7 @@ def simulate(
 
 @app.get("/recommend")
 def recommend(
-    outlet_temp: float = Query(32.0, description="Predicted outlet temperature in °C"),
+    outlet_temp: float = Query(32.0, ge=5, le=100, description="Predicted outlet temperature in °C"),
 ):
     hotspot_risk = classify_hotspot(outlet_temp)
 
@@ -212,12 +151,12 @@ def recommend(
 
 @app.get("/optimize")
 def optimize(
-    flow_rate: float = Query(12.0, gt=0, description="Current coolant flow rate"),
-    inlet_temp: float = Query(20.0, description="Current inlet temperature in °C"),
-    heat_load_kw: float = Query(100.0, gt=0, description="Current rack heat load in kW"),
+    flow_rate: float = Query(200.0, gt=0, le=1000, description="Current coolant flow rate in L/min"),
+    inlet_temp: float = Query(20.0, ge=5, le=35, description="Current inlet temperature in °C"),
+    heat_load_kw: float = Query(100.0, gt=0, le=500, description="Current rack heat load in kW"),
     cooling_efficiency: float = Query(
         0.85,
-        gt=0,
+        ge=0.1,
         le=1,
         description="Current cooling efficiency from 0 to 1",
     ),
@@ -228,12 +167,6 @@ def optimize(
         heat_load_kw,
         cooling_efficiency,
     )
-
-    if current_outlet is None:
-        return {
-            "status": "error",
-            "message": "Invalid cooling parameters.",
-        }
 
     current_outlet = round(float(current_outlet), 2)
     current_risk = classify_hotspot(current_outlet)
@@ -278,10 +211,10 @@ def optimize(
 def cluster_status(
     n_rows: int = Query(3, ge=2, le=6),
     n_cols: int = Query(4, ge=2, le=8),
-    base_heat_load_kw: float = Query(140.0, gt=10),
-    base_flow_rate: float = Query(12.0, gt=0),
-    inlet_temp: float = Query(20.0),
-    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    base_heat_load_kw: float = Query(140.0, gt=10, le=500),
+    base_flow_rate: float = Query(200.0, gt=0, le=1000),
+    inlet_temp: float = Query(20.0, ge=5, le=35),
+    cooling_efficiency: float = Query(0.82, ge=0.1, le=1),
     degradation_factor: float = Query(0.0, ge=0, le=1),
 ):
     racks = generate_rack_cluster(
@@ -296,13 +229,13 @@ def cluster_status(
 
     propagated = apply_neighbor_heat_propagation(racks, n_rows=n_rows, n_cols=n_cols)
     summary = cluster_summary(propagated)
-    surrogate_risk = surrogate_cluster_risk_prediction(propagated)
+    heuristic_risk = heuristic_cluster_risk_prediction(propagated)
 
     return {
         "status": "success",
         "project": "LiquidFlow AI",
         "cluster_summary": summary,
-        "surrogate_cluster_risk": surrogate_risk,
+        "heuristic_cluster_risk": heuristic_risk,
         "recommendations": get_cluster_recommendations(summary),
         "racks": propagated,
     }
@@ -313,10 +246,10 @@ def rack_detail(
     rack_id: str,
     n_rows: int = Query(3, ge=2, le=6),
     n_cols: int = Query(4, ge=2, le=8),
-    base_heat_load_kw: float = Query(140.0, gt=10),
-    base_flow_rate: float = Query(12.0, gt=0),
-    inlet_temp: float = Query(20.0),
-    cooling_efficiency: float = Query(0.82, gt=0, le=1),
+    base_heat_load_kw: float = Query(140.0, gt=10, le=500),
+    base_flow_rate: float = Query(200.0, gt=0, le=1000),
+    inlet_temp: float = Query(20.0, ge=5, le=35),
+    cooling_efficiency: float = Query(0.82, ge=0.1, le=1),
     degradation_factor: float = Query(0.0, ge=0, le=1),
 ):
     racks = generate_rack_cluster(
@@ -338,17 +271,14 @@ def rack_detail(
                 "recommendations": get_recommendations(rack["propagated_hotspot_risk"]),
             }
 
-    return {
-        "status": "not_found",
-        "message": f"Rack {rack_id} not found",
-    }
+    raise HTTPException(status_code=404, detail=f"Rack {rack_id} not found")
 
 
 @app.get("/thermal-forecast")
 def thermal_forecast(
-    current_max_temp: float = Query(32.0),
-    cooling_efficiency: float = Query(0.82, gt=0, le=1),
-    heat_load_kw: float = Query(180.0, gt=10),
+    current_max_temp: float = Query(32.0, ge=5, le=100),
+    cooling_efficiency: float = Query(0.82, ge=0.1, le=1),
+    heat_load_kw: float = Query(180.0, gt=10, le=500),
     steps: int = Query(24, ge=4, le=96),
 ):
     forecast = forecast_cluster_temperature(

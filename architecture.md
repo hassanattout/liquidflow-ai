@@ -2,7 +2,7 @@
 
 ## Strategic Positioning
 
-LiquidFlow AI is a physics-informed thermal intelligence platform designed for high-density AI infrastructure and liquid-cooled GPU clusters.
+LiquidFlow AI is a physics-based thermal intelligence prototype designed for high-density AI infrastructure and liquid-cooled GPU clusters.
 
 The system explores how lightweight thermal modeling, infrastructure simulation, forecasting, and optimization can support operational decision-making inside next-generation AI compute environments.
 
@@ -17,7 +17,7 @@ LiquidFlow AI models a simplified infrastructure intelligence stack composed of:
 
 1. thermal simulation
 2. multi-rack thermal propagation
-3. surrogate risk estimation
+3. transparent risk heuristics
 4. cooling optimization
 5. thermal forecasting
 6. infrastructure recommendations
@@ -74,7 +74,7 @@ The implementation is intentionally lightweight to support fast simulation, real
                                       │
                                       ▼
                         ┌──────────────────────────┐
-                        │ Surrogate Risk Layer     │
+                        │ Heuristic Risk Layer     │
                         └─────────────┬────────────┘
                                       │
                                       ▼
@@ -127,7 +127,7 @@ This makes the project feel like infrastructure software instead of a single-equ
 
 ---
 
-### 3. Surrogate Prediction Layer
+### 3. Heuristic Comparison Layer
 
 Location:
 
@@ -137,9 +137,12 @@ models/surrogate_model.py
 
 Purpose:
 
-- estimate thermal response
-- approximate cluster hotspot probability
-- provide placeholder path for future neural surrogate or PINN
+- provide a deterministic comparison with the energy-balance model
+- calculate an uncalibrated cluster hotspot score
+- provide a placeholder path for a future trained surrogate or PINN
+
+This layer is not a trained machine-learning model and its score is not a
+calibrated probability.
 
 ---
 
@@ -202,7 +205,7 @@ Purpose:
 - visualize rack thermal map
 - show forecast trends
 - provide operator recommendations
-- demonstrate multimodal workflow
+- demonstrate a clearly labeled, scenario-driven image overlay
 
 ---
 

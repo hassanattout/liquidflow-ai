@@ -2,9 +2,9 @@
 
 ### Thermal Intelligence Layer for High-Density AI Infrastructure
 
-LiquidFlow AI is a physics-informed thermal intelligence platform for liquid-cooled GPU clusters and next-generation AI data centers.
+LiquidFlow AI is a physics-based thermal intelligence prototype for liquid-cooled GPU clusters and next-generation AI data centers.
 
-The platform combines thermal simulation, multi-rack propagation modeling, surrogate risk estimation, cooling optimization, infrastructure telemetry visualization, and operator recommendations.
+The platform combines a steady-state coolant energy balance, multi-rack propagation heuristics, cooling optimization, infrastructure visualization, and operator recommendations.
 
 It is designed as an early prototype of an AI infrastructure intelligence layer: a system that helps operators understand, forecast, and optimize thermal behavior in high-density compute environments.
 
@@ -35,7 +35,7 @@ Traditional CFD simulations are powerful but often too heavy for real-time opera
 
 LiquidFlow AI explores a lightweight alternative:
 
-> physics-informed simulation + surrogate prediction + infrastructure optimization.
+> physically grounded simulation + transparent heuristics + infrastructure optimization.
 
 ---
 
@@ -65,12 +65,15 @@ LiquidFlow AI explores a lightweight alternative:
 - Peak temperature prediction
 - Escalation detection under sustained workload
 
-### Multimodal Inspection Workflow
+### Illustrative Inspection Workflow
 
 - Rack or thermal image upload
-- Hotspot overlay
-- Detection confidence scoring
-- Infrastructure inspection simulation
+- Scenario-driven hotspot overlay
+- Explicitly labeled demo annotations
+- Safe PNG and JPEG validation
+
+The overlay is illustrative. It does not run computer-vision inference or
+derive detections from image pixels.
 
 ### API Layer
 
@@ -111,7 +114,7 @@ Thermal Simulation Engine
         ↓
 Multi-Rack Propagation Model
         ↓
-Surrogate Risk Prediction
+Transparent Risk Heuristics
         ↓
 Thermal Forecasting Layer
         ↓
@@ -139,7 +142,7 @@ Operator Decision Support
 ### AI / Simulation
 
 - Physics-informed thermal logic
-- Surrogate risk prediction
+- Deterministic comparison and risk heuristics
 - Multi-rack propagation model
 - Forecasting heuristics
 - PINN-ready architecture
@@ -188,6 +191,31 @@ http://127.0.0.1:8000/docs
 streamlit run dashboard/app.py
 ```
 
+### Run validation
+
+```bash
+python -m compileall -q app dashboard models simulations tests image_safety.py
+pytest -q
+```
+
+GitHub Actions runs these checks on pull requests and pushes to `main` using
+Python 3.11.
+
+---
+
+## Modeling Scope
+
+The rack outlet-temperature model applies the steady-state water-loop balance
+`Q = m_dot × cp × ΔT`. API and dashboard flow rates are expressed in L/min;
+the implementation converts them to kg/s using a water density of 0.997 kg/L
+and a heat capacity of 4,182 J/(kg·K). Cooling efficiency is modeled as an
+effective reduction in heat-removal capacity.
+
+The multi-rack propagation, forecasting, risk score, PUE proxy, and comparison
+model are deterministic prototype heuristics. They have not been calibrated
+against production telemetry or CFD results and must not be used for equipment
+control or safety decisions.
+
 ---
 
 ## Example API Calls
@@ -195,7 +223,7 @@ streamlit run dashboard/app.py
 ### Single Rack Simulation
 
 ```bash
-curl "http://127.0.0.1:8000/simulate?flow_rate=12&inlet_temp=20&heat_load_kw=150&cooling_efficiency=0.82"
+curl "http://127.0.0.1:8000/simulate?flow_rate=250&inlet_temp=20&heat_load_kw=150&cooling_efficiency=0.82"
 ```
 
 ### Cluster Status
@@ -233,7 +261,7 @@ The long-term vision is an AI infrastructure operating layer that connects telem
 
 LiquidFlow AI is a functional prototype.
 
-Current version includes deterministic thermal simulation, multi-rack propagation, surrogate risk estimation, forecasting heuristics, API endpoints, and a Streamlit dashboard.
+Current version includes a water-loop energy-balance model, synthetic multi-rack propagation, deterministic risk and forecasting heuristics, API endpoints, and a Streamlit dashboard. The current heuristics are not trained ML models and are not calibrated against production telemetry.
 
 Future versions can integrate real telemetry, CFD-calibrated models, neural surrogates, PINNs, and GPU-accelerated inference.
 

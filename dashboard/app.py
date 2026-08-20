@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from simulations.thermal import (
     thermal,
+    optimize_cooling,
     classify_hotspot,
     calculate_risk_score,
     generate_rack_cluster,
@@ -20,9 +21,10 @@ from simulations.thermal import (
     get_cluster_recommendations,
 )
 from models.surrogate_model import (
-    surrogate_temperature_prediction,
-    surrogate_cluster_risk_prediction,
+    heuristic_temperature_prediction,
+    heuristic_cluster_risk_prediction,
 )
+from image_safety import ImageValidationError, load_validated_image
 
 
 st.set_page_config(
@@ -30,63 +32,6 @@ st.set_page_config(
     page_icon="💧",
     layout="wide",
 )
-
-
-def optimize_cooling(
-    flow_rate: float,
-    inlet_temp: float,
-    heat_load_kw: float,
-    cooling_efficiency: float,
-) -> dict:
-    best_result = None
-
-    flow_options = np.linspace(flow_rate, min(flow_rate * 2.0, 50), 20)
-    inlet_options = np.linspace(max(inlet_temp - 8, 5), inlet_temp, 10)
-    efficiency_options = np.linspace(
-        cooling_efficiency,
-        min(cooling_efficiency + 0.15, 1.0),
-        10,
-    )
-
-    for candidate_flow in flow_options:
-        for candidate_inlet in inlet_options:
-            for candidate_efficiency in efficiency_options:
-                candidate_outlet = thermal(
-                    candidate_flow,
-                    candidate_inlet,
-                    heat_load_kw,
-                    candidate_efficiency,
-                )
-
-                if candidate_outlet is None:
-                    continue
-
-                candidate_outlet = round(float(candidate_outlet), 2)
-                candidate_risk = classify_hotspot(candidate_outlet)
-                candidate_score = calculate_risk_score(candidate_outlet)
-
-                penalty = (
-                    abs(candidate_flow - flow_rate) * 0.4
-                    + abs(candidate_inlet - inlet_temp) * 0.8
-                    + abs(candidate_efficiency - cooling_efficiency) * 20
-                )
-
-                objective = candidate_outlet + penalty
-
-                result = {
-                    "optimized_flow_rate": round(float(candidate_flow), 2),
-                    "optimized_inlet_temp": round(float(candidate_inlet), 2),
-                    "optimized_cooling_efficiency": round(float(candidate_efficiency), 2),
-                    "optimized_outlet_temp": candidate_outlet,
-                    "optimized_hotspot_risk": candidate_risk,
-                    "optimized_risk_score": candidate_score,
-                    "objective_score": round(float(objective), 2),
-                }
-
-                if best_result is None or objective < best_result["objective_score"]:
-                    best_result = result
-
-    return best_result
 
 
 def draw_hotspot_overlay(
@@ -105,7 +50,6 @@ def draw_hotspot_overlay(
             {
                 "label": "Primary Hotspot",
                 "severity": "Critical",
-                "confidence": 0.91,
                 "box": (
                     int(width * 0.57),
                     int(height * 0.18),
@@ -116,7 +60,6 @@ def draw_hotspot_overlay(
             {
                 "label": "Cooling Imbalance",
                 "severity": "High",
-                "confidence": 0.84,
                 "box": (
                     int(width * 0.15),
                     int(height * 0.35),
@@ -130,7 +73,6 @@ def draw_hotspot_overlay(
             {
                 "label": "Stable Thermal Zone",
                 "severity": "Low",
-                "confidence": 0.78,
                 "box": (
                     int(width * 0.58),
                     int(height * 0.32),
@@ -144,11 +86,10 @@ def draw_hotspot_overlay(
         box = detection["box"]
         label = detection["label"]
         severity = detection["severity"]
-        confidence = detection["confidence"]
 
         draw.rectangle(box, outline=(255, 40, 40), width=10)
 
-        text = f"{label} | {severity} | {round(confidence * 100)}%"
+        text = f"{label} | {severity} | scenario score {risk_score}/100"
         text_position = (box[0], max(0, box[1] - 28))
 
         draw.rectangle(
@@ -168,7 +109,7 @@ def draw_hotspot_overlay(
 
 SCENARIOS = {
     "Balanced AI Training Rack": {
-        "flow_rate": 12.0,
+        "flow_rate": 200.0,
         "inlet_temp": 20.0,
         "heat_load_kw": 100.0,
         "cooling_efficiency": 0.85,
@@ -176,7 +117,7 @@ SCENARIOS = {
         "degradation": 0.0,
     },
     "High-Density MI300X Cluster": {
-        "flow_rate": 8.0,
+        "flow_rate": 150.0,
         "inlet_temp": 24.0,
         "heat_load_kw": 260.0,
         "cooling_efficiency": 0.55,
@@ -184,7 +125,7 @@ SCENARIOS = {
         "degradation": 0.35,
     },
     "Cooling Loop Degradation": {
-        "flow_rate": 5.0,
+        "flow_rate": 100.0,
         "inlet_temp": 28.0,
         "heat_load_kw": 220.0,
         "cooling_efficiency": 0.40,
@@ -192,7 +133,7 @@ SCENARIOS = {
         "degradation": 0.65,
     },
     "Emergency Thermal Event": {
-        "flow_rate": 3.0,
+        "flow_rate": 70.0,
         "inlet_temp": 32.0,
         "heat_load_kw": 300.0,
         "cooling_efficiency": 0.25,
@@ -231,8 +172,8 @@ with st.sidebar:
 
     flow_rate = st.slider(
         "Coolant flow rate",
-        1.0,
-        50.0,
+        20.0,
+        600.0,
         float(scenario["flow_rate"]),
     )
 
@@ -298,19 +239,15 @@ outlet_temp = thermal(
     effective_efficiency,
 )
 
-surrogate_prediction = surrogate_temperature_prediction(
+heuristic_prediction = heuristic_temperature_prediction(
     flow_rate,
     inlet_temp,
     heat_load_kw,
     effective_efficiency,
 )
 
-if outlet_temp is None:
-    st.error("Invalid parameters. Flow rate and cooling efficiency must be greater than 0.")
-    st.stop()
-
 outlet_temp = round(float(outlet_temp), 2)
-surrogate_prediction = round(float(surrogate_prediction), 2)
+heuristic_prediction = round(float(heuristic_prediction), 2)
 
 hotspot_risk = classify_hotspot(outlet_temp)
 risk_score = calculate_risk_score(outlet_temp)
@@ -323,7 +260,7 @@ k1.metric("Outlet Temperature", f"{outlet_temp} °C")
 k2.metric("Hotspot Classification", hotspot_risk)
 k3.metric("Thermal Risk Index", f"{risk_score}/100")
 k4.metric("Cooling Safety Margin", f"{cooling_margin} °C")
-k5.metric("Surrogate Prediction", f"{surrogate_prediction} °C")
+k5.metric("Comparison Heuristic", f"{heuristic_prediction} °C")
 
 st.divider()
 
@@ -341,7 +278,7 @@ racks = generate_rack_cluster(
 
 racks = apply_neighbor_heat_propagation(racks, n_rows=n_rows, n_cols=n_cols)
 summary = cluster_summary(racks)
-cluster_surrogate = surrogate_cluster_risk_prediction(racks)
+cluster_heuristic = heuristic_cluster_risk_prediction(racks)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -437,10 +374,10 @@ with right_cluster:
         st.success("Cluster operating within stable thermal conditions.")
 
     st.write(
-        f"Surrogate hotspot probability: "
-        f"**{cluster_surrogate['cluster_hotspot_probability']}**"
+        f"Heuristic hotspot score: "
+        f"**{cluster_heuristic['cluster_hotspot_score']}**"
     )
-    st.write(f"Main risk driver: **{cluster_surrogate['risk_driver']}**")
+    st.write(f"Main risk driver: **{cluster_heuristic['risk_driver']}**")
 
     st.write("Recommended actions:")
     for rec in get_cluster_recommendations(summary):
@@ -578,7 +515,7 @@ st.divider()
 
 st.subheader("🧪 Physics Model Comparison")
 
-baseline_error = round(abs(outlet_temp - surrogate_prediction), 2)
+baseline_error = round(abs(outlet_temp - heuristic_prediction), 2)
 
 p1, p2, p3 = st.columns(3)
 
@@ -586,37 +523,33 @@ with p1:
     st.metric("Simulation Engine", f"{outlet_temp} °C")
 
 with p2:
-    st.metric("Surrogate Model", f"{surrogate_prediction} °C")
+    st.metric("Comparison Heuristic", f"{heuristic_prediction} °C")
 
 with p3:
     st.metric("Model Difference", f"{baseline_error} °C")
 
 if baseline_error < 2:
-    st.success("Surrogate model is closely aligned with the physics simulation.")
+    st.success("The comparison heuristic is closely aligned with the energy-balance model.")
 elif baseline_error < 5:
-    st.info("Surrogate model shows moderate deviation from the physics simulation.")
+    st.info("The comparison heuristic shows moderate deviation from the energy-balance model.")
 else:
-    st.warning("Surrogate model deviation is high. Future PINN training can reduce this gap.")
+    st.warning("Heuristic deviation is high. A future trained model can replace this baseline.")
 
 st.divider()
 
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3 = st.columns(3)
 
 gpu_utilization = min(100, round((heat_load_kw / 300) * 100))
-cooling_pressure = round(flow_rate * 0.42, 2)
 pue_estimate = round(1.1 + ((100 - estimated_efficiency) / 100), 2)
 
 with m1:
     st.metric("Estimated Rack Power", f"{heat_load_kw} kW")
 
 with m2:
-    st.metric("GPU Utilization", f"{gpu_utilization}%")
+    st.metric("Synthetic Load Proxy", f"{gpu_utilization}%")
 
 with m3:
-    st.metric("Cooling Loop Pressure", f"{cooling_pressure} bar")
-
-with m4:
-    st.metric("Estimated PUE", f"{pue_estimate}")
+    st.metric("Estimated PUE Proxy", f"{pue_estimate}")
 
 st.divider()
 
@@ -699,10 +632,18 @@ with right:
 
 st.divider()
 
-st.subheader("👁️ Multimodal Thermal Image Analysis")
+st.subheader("👁️ Illustrative Inspection Overlay")
+st.caption(
+    "Demo-only overlay driven by the selected thermal scenario. "
+    "It is not computer-vision inference and does not inspect image pixels."
+)
 
 if uploaded_image is not None:
-    image = Image.open(uploaded_image)
+    try:
+        image = load_validated_image(uploaded_image.getvalue(), uploaded_image.name)
+    except ImageValidationError as exc:
+        st.error(str(exc))
+        st.stop()
 
     annotated_image, detections = draw_hotspot_overlay(
         image,
@@ -722,7 +663,7 @@ if uploaded_image is not None:
     with img2:
         st.image(
             annotated_image,
-            caption="AI hotspot overlay",
+            caption="Scenario-driven illustrative overlay",
             use_container_width=True,
         )
 
@@ -730,16 +671,15 @@ if uploaded_image is not None:
 
     for detection in detections:
         st.write(
-            f"• {detection['label']} | "
-            f"Severity: {detection['severity']} | "
-            f"Confidence: {round(detection['confidence'] * 100)}%"
+            f"• {detection['label']} | Severity: {detection['severity']} | "
+            f"Scenario risk score: {risk_score}/100"
         )
 
-    st.success("Vision analysis pipeline active")
+    st.info("Illustrative overlay active. No vision model is running.")
 
 else:
     st.write(
-        "Upload a rack, cooling plate, or thermal image to activate the multimodal analysis module."
+        "Upload a rack, cooling plate, or thermal image to preview the illustrative overlay."
     )
 
 st.divider()
@@ -768,10 +708,9 @@ else:
 
 events.extend(
     [
-        f"METRIC • GPU utilization at {gpu_utilization}%",
+        f"METRIC • Synthetic load proxy at {gpu_utilization}%",
         f"METRIC • Single rack power at {heat_load_kw} kW",
         f"METRIC • Cluster heat load at {summary['total_heat_load_kw']} kW",
-        f"METRIC • Cooling loop pressure at {cooling_pressure} bar",
     ]
 )
 
