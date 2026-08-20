@@ -1,19 +1,106 @@
 import numpy as np
 
 
+WATER_DENSITY_KG_PER_L = 0.997
+WATER_HEAT_CAPACITY_J_PER_KG_K = 4182.0
+
+
+def _require_finite(name: str, value: float) -> float:
+    value = float(value)
+    if not np.isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
+
+
 def thermal(flow_rate, inlet_temp, heat_load_kw, cooling_efficiency):
     """
-    Single-rack liquid cooling outlet temperature model.
+    Estimate coolant outlet temperature with a steady-state energy balance.
 
-    This remains intentionally lightweight for real-time dashboard use.
+    ``flow_rate`` is water flow in L/min and ``heat_load_kw`` is heat transferred
+    to the coolant in kW. The calculation uses Q = m_dot * cp * delta_T.
     """
-    if flow_rate * cooling_efficiency <= 0:
-        return None
+    flow_rate = _require_finite("flow_rate", flow_rate)
+    inlet_temp = _require_finite("inlet_temp", inlet_temp)
+    heat_load_kw = _require_finite("heat_load_kw", heat_load_kw)
+    cooling_efficiency = _require_finite("cooling_efficiency", cooling_efficiency)
 
-    delta_temp = heat_load_kw / (flow_rate * cooling_efficiency)
+    if flow_rate <= 0:
+        raise ValueError("flow_rate must be greater than 0 L/min")
+    if not 5 <= inlet_temp <= 35:
+        raise ValueError("inlet_temp must be between 5 and 35 °C")
+    if heat_load_kw <= 0:
+        raise ValueError("heat_load_kw must be greater than 0 kW")
+    if not 0 < cooling_efficiency <= 1:
+        raise ValueError("cooling_efficiency must be in (0, 1]")
+
+    mass_flow_kg_s = flow_rate * WATER_DENSITY_KG_PER_L / 60.0
+    heat_load_w = heat_load_kw * 1000.0
+    delta_temp = heat_load_w / (
+        mass_flow_kg_s
+        * WATER_HEAT_CAPACITY_J_PER_KG_K
+        * cooling_efficiency
+    )
     outlet_temp = inlet_temp + delta_temp
 
     return round(float(outlet_temp), 2)
+
+
+def optimize_cooling(
+    flow_rate: float,
+    inlet_temp: float,
+    heat_load_kw: float,
+    cooling_efficiency: float,
+) -> dict:
+    """Search bounded operating points using the shared thermal model."""
+    current_outlet = thermal(
+        flow_rate, inlet_temp, heat_load_kw, cooling_efficiency
+    )
+    best_result = None
+
+    flow_options = np.linspace(flow_rate, min(flow_rate * 2.0, 1000.0), 20)
+    inlet_options = np.linspace(max(inlet_temp - 8.0, 5.0), inlet_temp, 10)
+    efficiency_options = np.linspace(
+        cooling_efficiency, min(cooling_efficiency + 0.15, 1.0), 10
+    )
+
+    for candidate_flow in flow_options:
+        for candidate_inlet in inlet_options:
+            for candidate_efficiency in efficiency_options:
+                candidate_outlet = thermal(
+                    candidate_flow,
+                    candidate_inlet,
+                    heat_load_kw,
+                    candidate_efficiency,
+                )
+                candidate_risk = classify_hotspot(candidate_outlet)
+                candidate_score = calculate_risk_score(candidate_outlet)
+
+                relative_flow_change = abs(candidate_flow - flow_rate) / flow_rate
+                inlet_change = abs(candidate_inlet - inlet_temp)
+                efficiency_change = abs(candidate_efficiency - cooling_efficiency)
+                penalty = (
+                    relative_flow_change * 3.0
+                    + inlet_change * 0.8
+                    + efficiency_change * 20.0
+                )
+                objective = candidate_outlet + penalty
+
+                result = {
+                    "optimized_flow_rate": round(float(candidate_flow), 2),
+                    "optimized_inlet_temp": round(float(candidate_inlet), 2),
+                    "optimized_cooling_efficiency": round(float(candidate_efficiency), 3),
+                    "optimized_outlet_temp": round(float(candidate_outlet), 2),
+                    "optimized_hotspot_risk": candidate_risk,
+                    "optimized_risk_score": candidate_score,
+                    "objective_score": round(float(objective), 4),
+                }
+                if best_result is None or objective < best_result["objective_score"]:
+                    best_result = result
+
+    best_result["temperature_reduction_c"] = round(
+        current_outlet - best_result["optimized_outlet_temp"], 2
+    )
+    return best_result
 
 
 def classify_hotspot(outlet_temp: float) -> str:
@@ -34,7 +121,7 @@ def generate_rack_cluster(
     n_rows: int = 3,
     n_cols: int = 4,
     base_heat_load_kw: float = 140.0,
-    base_flow_rate: float = 12.0,
+    base_flow_rate: float = 200.0,
     inlet_temp: float = 20.0,
     cooling_efficiency: float = 0.82,
     hotspot_row: int = 1,
